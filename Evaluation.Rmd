@@ -1,0 +1,235 @@
+---
+title: "Projet_AS"
+author: "kilian_ber"
+date: "2023-11-16"
+output: html_document
+---
+
+# Découverte des données
+
+```{r librairies}
+
+```
+
+## Import des données
+
+```{r import données}
+data_2000_2018 <- read.csv("./data/Datasets/final_dataset.csv")
+data_2018_2019 <- read.csv("./data/Datasets/2018-19.csv")
+data_2019_2020 <- read.csv("./data/Datasets/2019-20.csv")
+data_2020_2021 <- read.csv("./data/2020-2021.csv")
+data_2021_2022 <- read.csv("./data/2021-2022.csv")
+classement <- read.csv("./data/Datasets/EPLStandings.csv")
+```
+
+## Liste des abréviations de variables 
+
+Div = Division de la ligue
+
+Date = Date du match (jj/mm/aa)
+
+HomeTeam = équipe locale
+
+AwayTeam = Équipe à l'extérieur
+
+FTHG = Buts de l'équipe locale à temps plein
+
+FTAG = Buts de l'équipe en déplacement à temps plein
+
+FTR = Résultat à temps plein (H=Victoire à domicile, D=Nul, A=Victoire à l'extérieur)
+
+HTHG = Buts de l'équipe locale à la mi-temps
+
+HTAG = Buts de l'équipe adverse à la mi-temps
+
+HTR = Résultat de la mi-temps (H=Victoire à domicile, D=Nul, A=Victoire à l'extérieur)
+
+Statistiques du match (si disponibles)
+
+Assistance = Assistance de la foule
+
+Referee = Arbitre du match
+
+HS = Tirs de l'équipe locale
+
+AS = Tirs de l'équipe à l'extérieur
+
+HST = Tirs cadrés de l'équipe locale
+
+AST = Tirs cadrés de l'équipe adverse
+
+HHW = L'équipe locale a touché un bois
+
+AHW = Équipe de l'extérieur qui touche les bois
+
+HC = Coins de l'équipe locale
+
+AC = Couloirs de l'équipe adverse
+
+HF = Fautes commises par l'équipe locale
+
+AF = Fautes commises par l'équipe adverse
+
+HO = Hors-jeu de l'équipe locale
+
+AO = Hors-jeu de l'équipe adverse
+
+HY = Cartons jaunes de l'équipe locale
+
+AY = Cartons jaunes de l'équipe adverse
+
+HR = Cartons rouges de l'équipe locale
+
+AR = Cartons rouges de l'équipe adverse
+
+HBP = Points de cartons jaunes de l'équipe locale (10 = jaune, 25 = rouge)
+
+ABP = Points de réservation de l'équipe à l'extérieur (10 = jaune, 25 = rouge)
+
+Clé pour les données de cotes de paris 1X2 (match) :
+
+B365H = Bet365 cote victoire à domicile
+
+B365D = cote Bet365 pour le match nul
+
+B365A = Bet365 cote victoire à l'extérieur
+
+BSH = Blue Square cote victoire à domicile
+
+BSD = Blue Square cote match nul
+
+BSA = Blue Square cote victoire à l'extérieur
+
+BWH = Bet&Win cote victoire à domicile
+
+BWD = Bet&Win cote match nul
+
+BWA = Bet&Win cote victoire à l'extérieur
+
+GBH = Gamebookers cote victoire à domicile
+
+GBD = Cotes Gamebookers match nul
+
+GBA = Gamebookers cote victoire à l'extérieur
+
+IWH = Interwetten cote victoire à domicile
+
+IWD = Interwetten cotes match nul
+
+IWA = Interwetten cote victoire à l'extérieur
+
+LBH = Ladbrokes cote victoire à domicile
+
+LBD = cote Ladbrokes pour le match nul
+
+LBA = Ladbrokes cote victoire à l'extérieur
+
+PSH = Pinnacle Sports cote victoire à domicile
+
+PSD = cote Pinnacle Sports sur le match nul
+
+PSA = Pinnacle Sports cote victoire à l'extérieur
+
+SOH = Sporting Odds cote victoire à domicile
+
+SOD = cote Sporting Odds pour le match nul
+
+SOA = Sporting Odds cote victoire à l'extérieur
+
+SBH = Sportingbet cote victoire à domicile
+
+SBD = cote Sportingbet pour le match nul
+
+SBA = Sportingbet cote victoire à l'extérieur
+
+SJH = Stan James cote victoire à domicile
+
+SJD = cote Stan James pour le match nul
+
+SJA = Stan James cote victoire à l'extérieur
+
+SYH = Cotes Stanleybet victoire à domicile
+
+SYD = Cotes Stanleybet match nul
+
+SYA = Cotes Stanleybet victoire à l'extérieur
+
+VCH = VC Bet cote victoire à domicile
+
+VCD = Cotes VC Bet match nul
+
+VCA = VC Bet cote victoire à l'extérieur
+
+WHH = William Hill cote victoire à domicile
+
+WHD = cote William Hill pour le match nul
+
+WHA = William Hill cote victoire à l'extérieur
+
+Bb1X2 = Nombre de bookmakers BetBrain utilisés pour calculer les moyennes et les maximums des cotes de match
+
+BbMxH = cote maximale de Betbrain pour la victoire à domicile
+
+BbAvH = cote moyenne de Betbrain pour la victoire à domicile
+
+BbMxD = cote maximale de Betbrain pour le match nul
+
+BbAvD = cote moyenne de Betbrain pour la victoire au match nul
+
+BbMxA = Betbrain cote maximale de victoire à l'extérieur
+
+BbAvA = cote moyenne Betbrain pour la victoire à l'extérieur
+
+Clé des cotes de paris sur le nombre total de buts :
+
+BbOU = Nombre de bookmakers BetBrain utilisés pour calculer les moyennes et les maxima des plus/moins de 2,5 buts (total des buts)
+
+BbMx\>2.5 = cote maximale Betbrain pour les plus de 2,5 buts
+
+BbAv\>2.5 = Betbrain moyenne sur 2.5 buts
+
+BbMx\<2.5 = Betbrain maximum moins de 2.5 buts
+
+BbAv\<2.5 = Betbrain moyenne moins de 2.5 buts
+
+GB\>2.5 = Gamebookers plus de 2.5 buts
+
+GB\<2.5 = Gamebookers moins de 2,5 buts
+
+B365\>2.5 = Bet365 plus de 2.5 buts
+
+B365\<2.5 = Bet365 moins de 2.5 buts
+
+Clé des cotes de paris sur le handicap asiatique :
+
+BbAH = Nombre de bookmakers BetBrain utilisés pour les moyennes et maxima des handicaps asiatiques.
+
+BbAHh = Taille du handicap Betbrain (équipe locale)
+
+BbMxAHH = cote maximale de Betbrain pour le handicap asiatique de l'équipe locale
+
+BbAvAHH = cote moyenne de Betbrain pour le handicap asiatique de l'équipe à domicile
+
+BbMxAHA = cote maximale de Betbrain pour le handicap asiatique de l'équipe à l'extérieur
+
+BbAvAHA = Betbrain cote moyenne de l'équipe à l'extérieur avec handicap asiatique
+
+GBAHH = cote Gamebookers pour le handicap asiatique de l'équipe à domicile
+
+GBAHA = cote de Gamebookers pour le handicap asiatique de l'équipe à l'extérieur
+
+GBAH = Taille du handicap Gamebookers (équipe locale)
+
+LBAHH = Ladbrokes Handicap asiatique cote équipe à domicile
+
+LBAHA = cote Ladbrokes pour le handicap asiatique de l'équipe à l'extérieur
+
+LBAH = Taille du handicap Ladbrokes (équipe locale)
+
+B365AHH = Bet365 Handicap asiatique cote équipe à domicile
+
+B365AHA = Bet365 Handicap asiatique équipe à l'extérieur cote
+
+B365AH = Bet365 taille du handicap (équipe locale)
+
+## Analyse descriptive des données

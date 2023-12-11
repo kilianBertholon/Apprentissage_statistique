@@ -1,0 +1,1056 @@
+---
+title: "Cours_tp"
+author: "kilian_ber"
+date: "2023-09-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# **TP1**
+
+Jeu de données punting : jeu de données représantant diverses qualités des joueurs
+
+```{r ouverture du fichier}
+punting <- read.csv("../data/football_ame/punting.txt", sep = "\t")
+```
+
+**Objectif : Utiliser les différentes méthodes de validation croisée dans le but d'acquérir la méthodologie de ces dernières**
+
+1.  Validation croisée hold-out
+
+2.  Validation croisée leave-p-out
+
+3.  validation croisée K fold
+
+4.  Approches de validations croisées répétées
+
+5.  Approches de boostrap
+
+## Récapapitulatif convention notation
+
+Données observées --\> **Minuscules**
+
+Variables aléatoires sous jacentes --\> **Majuscules**
+
+**xi** --\> variable d'entrée
+
+**yi** --\> variable de sortie
+
+y (- au dessus de y) --\> moyenne
+
+## Validation croisée hold out
+
+La validation croisée repose sur la séparation des données en deux catégories. Les données d'entrainements et de tests (train data et test data).
+
+Ici on s'intéresse à la méthode hold-out. Séparation des données de manière aléatoires. Par la suite, on utilisera les données d'entrainement pour entrainer le modèles et les données de tests afin de pouvoir évaluer le modèle
+
+Exemple :
+
+```{r méthode hold out}
+library(caTools)
+
+#Rendre les données reproductibles 
+set.seed(123)
+#Séparation du jeu de données en deux de manière alétoires (ici petit jeu de données donc 80/20 mais si gros jeu de données tendre vers plus d'évaluateur)
+division <- sample.split(punting, SplitRatio = 0.8)
+train_data <- subset(punting, division == TRUE)
+test_data <- subset(punting, division == FALSE)
+```
+
+## Validation croisée leave-p-out (LGOCV) ou leave one out cross (LOOCV)
+
+Cette technique est plus avnacée que celle par hold-out et nécessite donc plus de temps.
+
+Elle repose sur l'utilisation de sous divisions en plis ( exemple : 100 échantillons divisés en 5 plis de 20 échantillons.)
+
+A partir de chaque itérations, on utilisera p plis pour entrainer notre modèle et k plis pour l'évalue. Et ceux de manière répétés.
+
+Exemple :
+
+Dans notre cas, on a 100 échantillons divisés en 5 plis de 20 échantillons. oN effectuera k itérations.
+
+**k1** : test data : p1 \|\| Train data p2,3,4,5
+
+k2 : test data : p2 \|\| train data p1,3,4,5
+
+k3 : test data : p3 \|\| train data p1,2,4,5
+
+...
+
+Ensuite, après chaque évaluation, on gardera la moyenne de l'ensemble des itérations pour évaluer le modèle.
+
+Cette méthode peut être utilisé avec utilisation de chaque indivu comme données de test
+
+```{r leave-one-out validation }
+###Ou chaque valeur est utisé comme évaluateur 
+library(caret)
+train_control <- trainControl(method="LOOCV")
+model <- train(Distance~., data = punting, method="lm", trControl = train_control)
+
+print(model)
+
+
+```
+
+```{r leave p out}
+library(caret)
+# Créer un modèle de régression linéaire multiple
+modele <- train(
+  Distance ~ .,  # La formule du modèle
+  data = punting,  # Les données
+  method = "lm",  # Le modèle (régression linéaire)
+  trControl = trainControl(
+    method = "cv",  # Utilisation de la validation croisée
+    number = 2,  # LGOCV : nombre d'itérations = nombre d'observations
+    allowParallel = TRUE  # Activer le calcul parallèle si possible
+  )
+)
+
+# Afficher les résultats
+summary(modele)
+```
+
+## Validation croisée K fold
+
+L'utilisation de la validation croisée k fold repose sur l'utilisation de plis de manière répétée en changeant l'évaluateur finale
+
+```{r k fold}
+library(caret)
+# Créer un modèle de régression linéaire multiple
+modele <- train(
+  Distance ~ .,  # La formule du modèle
+  data = punting,  # Les données
+  method = "lm",  # Le modèle (régression linéaire)
+  trControl = trainControl(
+    method = "cv",  # Utilisation de la validation croisée k-fold
+    number = 5,  # Nombre de plis (vous pouvez ajuster selon vos besoins)
+    allowParallel = TRUE  # Activer le calcul parallèle si possible
+  )
+)
+
+# Afficher les résultats
+summary(modele)
+```
+
+## Approche de validation croisées répétées
+
+On cherche à rendre notre modèle le plus juste possible. AInsi, on va répéter les procédures de validation croisées vues précédemment (un certains nombre de fois (défini) dans le but de rendre notre modèle le plus **robuste** possible.
+
+## Approche du bootstrap
+
+Le bootstrap est une technique de ré-échantillonnage largement utilisée en statistiques et en apprentissage automatique. Il permet d'estimer la distribution d'une statistique d'intérêt (par exemple, la moyenne, la médiane, la variance, etc.) en tirant de multiples échantillons (appelés échantillons bootstrap) à partir de l'ensemble de données d'origine. Cette technique est utile pour estimer des intervalles de confiance, évaluer la variabilité d'une statistique et effectuer des tests d'hypothèses.
+
+Le but étant d'obtenir plus de données qui soit assez proches des données d'origines sans pour autant déformer la globalité du modèle
+
+# Cours
+
+## Algorithmes de prédiction par minimisation de risque empirique
+
+### Régression linéaire
+
+Appartient à la famille des algorithm de prédiction par minimisation du risque
+
+Le risque empirique sous estime le vrai risque --\> un prédicteur sur-apprend si :
+
+-   La classe de fonctions sur laquelle on minimise le risque empirique est restreint et/ou
+
+-   Un terme de pénalisation ou de régularistation est ajouté au risque empirique (essayer de limiter le fait d'évaluer les données à partir des données d'apprentissages)
+
+R\^2 --\> Permet d'expliquer la pertinence d'un ajustement linéaire pour nos données (pas utile en ML)
+
+En régression, on évite d'avoir des variables trop corrélées.
+
+#### procédure de sélection de variables
+
+-   Méthode backward : Eliminer variable par variable de la moins significative jusqu'à avoir des variables toutes significatives
+
+-   méthode forward: même chose mais dans l'autre sens
+
+-   Méthode stepward : ajouter ou diminuer d'une variable à la fois
+
+-   Méthode de sélection exhaustive : regarder toutes les combinaisons avec comme critères de validations la validation croisée.
+
+#### Critère de sélection des variables
+
+-   R\^2 ajusté
+
+-   Cp de Mallows
+
+-   AIC
+
+-   BIC
+
+-   PRESS
+
+#### Principales fonctions
+
+-   lm
+
+-   rstudent
+
+-   ...
+
+# TP2 : Pratique en cours
+
+Régression linéaire simple (1 variable)
+
+```{r régression linéaire simple}
+library(bestglm)
+library(ggplot2)
+punt <- punting[,0:6]
+
+#Faire la régression lineaire 
+punt_lm <- lm(punt$Distance ~ punt$R_Strength) #Si on e veut pas la constant il faut rajouter - 1 
+punt_lm_sans_k <- lm(punt$Distance ~ punt$R_Strength-1) #Si on e veut pas la constant il faut rajouter - 1 
+
+attributes(punt_lm) #Permet d'afficher tout les items de l'objets 
+
+summary(punt_lm)
+
+ggplot(data = punt, aes(Distance, R_Strength)) + geom_point()+ geom_smooth(method= "lm", se = FALSE, col = "red") + labs (title = "Regression linéaire Force JB/ distance", x = "Distance", y = "Force jambe droite")
+```
+
+Régression linéaire avec toutes les variables ( + sélections)
+
+```{r régression linéaire avec toutes les variables }
+
+library(MASS)
+punt_full <- lm(Distance ~., data = punt)
+
+```
+
+### Estimation du risque quadratique par validation croisée hold out répétée
+
+```{r validation croisée hold out répétée}
+n <- nrow(punt)
+
+risque_ho <- numeric(100)
+risque_hoRS <- numeric(100)
+
+#####Réalisation d'une boucle pour la méthode répétée 
+for (b in 1:100){
+  indmix <- sample(1:n,n,replace=F)
+
+#Appliquer le mélange 
+  punt_mix <- punt[indmix,]
+  #ceil permet d'arrondir à l'entier supérieur 
+  train <- punt_mix[1:ceiling(n/2),]
+  test <- punt_mix[(ceiling(n/2)+1):n,]
+
+#Focntion pred 
+  punt_lm_full <- lm(Distance~., data = train)
+  punt_pred <- predict(punt_lm_full, test)
+  risque_ho[b] <- sum((test$Distance-punt_pred)^2)
+  
+  
+  punt_lm_RS <- lm(Distance~ R_Strength+R_Flexibility, data = train)
+  punt_pred_RS <- predict(punt_lm_RS, test)
+  risque_hoRS[b] <- sum((test$Distance-punt_pred_RS)^2)
+}
+
+mean(risque_ho)
+mean(risque_hoRS)
+```
+
+**Conseil :**
+
+Si peu de données --\> leave-one-out
+
+BCP de données --\> validation croisée 10 blocks
+
+moyen --\> vc 5 blocks
+
+\--\> Si bcp de données pas de répétititons
+
+#### Leave one out cross validation
+
+```{r validation croisée avec LOO}
+library(bestglm)
+punt2 <- punt[, c("R_Strength", "L_Strength", "R_Flexibility", "L_Flexibility", "Distance")]
+bestLOO <- bestglm(punt2, IC = "LOOCV")
+summary(bestLOO)
+```
+
+Validation croisée 2 block répétés 10 fois
+
+```{r}
+bestCV <- bestglm(punt2,IC="CV", CVArgs = list(Method="HTF", K=2, REP = 10))
+```
+
+# Cours 3
+
+### Apprentissage du package train de caret
+
+#### Partie en autonomie
+
+```{r}
+library(caret)
+library(tidymodels)
+# Créer un modèle de régression linéaire multiple
+modele <- train(
+  Distance ~ R_Strength,  # La formule du modèle
+  data = punting,  # Les données
+  method = "lm",  # Le modèle (régression linéaire)
+  trControl = trainControl(
+    method = "cv",  # Utilisation de la validation croisée k-fold
+    number = 5,  # Nombre de plis (vous pouvez ajuster selon vos besoins)
+    allowParallel = TRUE  # Activer le calcul parallèle si possible
+  )
+)
+
+# Afficher les résultats
+summary(modele)
+```
+
+#### Partie en direct avec la prof
+
+Pour les régressions prendre le RSME
+
+```{r}
+library(caret)
+library(glmnet)
+####Ridge 
+modele <- train(
+  Distance ~ .,  
+  data = punting, 
+  method = "glmnet", 
+  tuneGrid = data.frame(lambda = 1:100, alpha = rep(0,100)),
+  trControl = trainControl(
+    method = "repeatedcv",  
+    number = 3,
+    repeats = 20)
+)
+
+# Afficher les résultats
+summary(modele)
+
+#Afficher le meilleur lambda
+modele$bestTune
+
+```
+
+Utilisation du packages ISLR pour obtenir le jeu de données Hitters
+
+```{r}
+library(ISLR)
+data(Hitters)
+```
+
+## Régression linéaire régularisée
+
+Le principe de ce genre de régression est de chercher un **prédicteur qui va agir par minimisation** du risque empirique régularisée
+
+Plusieurs méthodes :
+
+-   **Modèle de regression Ridge** (q' = 2)
+
+-   **Modèle de régression ridge** (q' = 1)
+
+Ces méthodes se basent sur un ajustement de la méthode des moindre carrés ordinaires avec une correction ( car on sait que les MCO surestiment les erreurs)
+
+Le biais d'un estimateur est l'erreur moyenne d'un estimateur.4
+
+Le risque d'un estimateur est le biais au carré + la variance d'un estimateur
+
+### Régression ridge
+
+Utilisation de la méthode des moindre carrés tout en limitant le risque. On obtient les coefficient par mlinimisation de la somme des carrés des résidus.
+
+Le ridge permet une sélection des variables de manière assez confiante en minimisant les risques.
+
+***Avantages :***
+
+-   Fonctionne à grande dimension (même lorsque n\<p)
+
+-   Sélection parcimonieuses
+
+***Inconvénients :***
+
+-   Quelques problèmes lorsque les variables sont fortement corrélees
+
+Exemple :
+
+```{r ridge avec glmnet}
+library(caret)
+library(glmnet)
+
+#Définir la variable de réponse
+y <- mtcars$hp
+
+#Définir les variables explicatives (sous la forme d'une matrice)
+x <- data.matrix(mtcars[, c('mpg', 'wt', 'drat', 'qsec')])
+
+#Trouvez le lambda optimal
+cv_model <- cv.glmnet(x, y, alpha=1)
+
+#trouvez le meilleur lambda à partir du MSE 
+best_lambda <- cv_model$lambda.min
+
+#Tracer le plot du test MSE à partir des valeurs de lambda
+plot(cv_model)
+
+#Trouvez le coefficient du meilleur modèle 
+best_model <- glmnet(x, y, alpha = 1, lambda = best_lambda)
+
+######Utilisation du ridge pour faire de nouvelles prédictions
+new <- matrix(c(24,2.5,2.5,18.5), nrow = 1, ncol = 4)
+
+
+#Prédictiondes des nouvelles valeurs
+predict(best_model, s = best_lambda, newx = new)
+
+```
+
+```{r}
+library(caret)
+library(glmnet)
+####ridge 
+modele <- train(
+  Distance ~ .,  
+  data = punting, 
+  method = "glmnet", 
+  tuneGrid = data.frame(lambda = seq(4,8, length = 100), alpha = rep(1,100)),
+  trControl = trainControl(
+    method = "repeatedcv",  
+    number = 3,
+    repeats = 20)
+)
+
+
+#Afficher le meilleur lambda
+modele$bestTune
+
+##Expand.grid --> Permet d'optimiser les hyperparamètres 
+
+```
+
+# TP4 : Tidymodels
+
+## Base
+
+```{r}
+library(tidymodels)
+
+#Permet de voir tout les packages qui permettent de faire ce que l'on sélectionne 
+#show_engines("linear_reg")
+
+#Import dataset
+punting <- read.csv("../data/football_ame/punting.txt", sep = "\t")
+punt2 <- punting |> select(c("Distance", "R_Strength", "L_Strength", "R_Flexibility", "L_Flexibility"))
+
+#Création du modèle 
+lm_model <- linear_reg() |>
+  set_engine("lm") |>  #Préciser le modèle utilisé 
+  set_mode("regression") #Précisé si regréssion ou classification 
+
+#Création du jeu de donéne dans les mesures que l'on veut 
+lm_rec <- recipe(Distance ~ ., data = punt2)  #Préparation des données 
+#   step_center(all_numeric())|> #Convertir les données au bon format 
+#   step_scale(all_numeric())
+
+#Création du worflow (zone ou on va pouvoir ajouter les paramètres du model et le jeu de données)
+lm_wf <- workflow() |> #Mise en place de l'algorithme a
+  add_model(lm_model) |> #Ajouter le modèle que l'on a crée 
+  add_recipe(lm_rec)  #Ajout des données que l'on à préparer 
+
+#Repréciser les données 
+lm_fit <- lm_wf |> 
+  fit(data = punt2)
+
+##Affichage des données avec : 
+# Termes du modèles 
+#Coefficient 
+#Sd 
+#Statistivs de tests
+#P.value
+lm_fit |> tidy()
+
+#|| 
+
+#Autre facon 
+#R^2
+#AIC
+#BIC
+lm_fit |> glance()
+
+#Prédiction 
+# lm_fit |>
+#   predict(new_data=newd)
+
+```
+
+## Régression ridge
+
+```{r Regression ridge}
+ridge_model <- linear_reg() |>
+  set_engine("glmnet") |> #On utilise la package glmnet car cest celui qui perrmet de faire de la régression ridge ou LASSO
+  set_mode("regression") |>
+  set_args(penalty = tune(), mixture = 1) #Penalty = lambda (on va le tuner), mixture = 1 pour la lasso
+
+#Création du worflow de travail 
+ridge_wf <- workflow() |>
+  add_model(ridge_model) |>
+  add_formula(Distance~.)
+
+#Valdiation croiséee pour trouver le lambda
+punt_cv <- vfold_cv(punt2, v=2) #Permet de stocker les diff blocks qui vont permettre de faire de la validation croisée
+lambda_grid <- grid_regular(penalty(range = c(-5,2)), levels = 100) #Déinir une grille de lambda pour chosiir celui qui sera optimal. On veut une grille optimal. Range = la puissance (ici de 10^-5 à 10^2)
+
+ridge_cv <- ridge_wf |> 
+  tune_grid(resamples =punt_cv, grid = lambda_grid, metrics = metric_set(rmse)) #Ajustement de la grille en utilisant le workflow (on précise dans resamples les échatntillons, on précise la grille de paramètres que l'on veut utiliser, et la métrics d'évaluations)
+
+#Collecter les metric s
+res <- ridge_cv |>
+  collect_metrics()
+
+#Grpah normale
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() 
+#Graphe à l'échelle logarithmique 
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() + scale_x_log10()
+
+#Sélectionner le lambda avec le meilleur rmse
+lowest_rmse <- ridge_cv |> select_best(metric = "rmse")
+
+#Sélectionner le lambda le plus bas pour RMSE et l'afficher dans notre modèle 
+final_wf <- finalize_workflow(ridge_wf, lowest_rmse)
+
+#Relancer le modèle sur notre jeu de donnée
+final_ridge <- final_wf |>fit(punt2)
+final_ridge |> tidy()
+
+
+```
+
+## Régression RIDGE
+
+```{r}
+ridge_model <- linear_reg() |>
+  set_engine("glmnet") |> #On utilise la package glmnet car cest celui qui perrmet de faire de la régression ridge ou RIDGE
+  set_mode("regression") |>
+  set_args(penalty = tune(), mixture = 0) #Penalty = lambda (on va le tuner), mixture = 0 pour la ridge
+
+#Création du worflow de travail 
+ridge_wf <- workflow() |>
+  add_model(ridge_model) |>
+  add_formula(Distance~.)
+
+#Valdiation croiséee pour trouver le lambda
+punt_cv <- vfold_cv(punt2, v=2) #Permet de stocker les diff blocks qui vont permettre de faire de la validation croisée
+lambda_grid <- grid_regular(penalty(range = c(-5,2)), levels = 100) #Déinir une grille de lambda pour chosiir celui qui sera optimal. On veut une grille optimal. Range = la puissance (ici de 10^-5 à 10^2)
+
+ridge_cv <- ridge_wf |> 
+  tune_grid(resamples =punt_cv, grid = lambda_grid, metrics = metric_set(rmse)) #Ajustement de la grille en utilisant le workflow (on précise dans resamples les échatntillons, on précise la grille de paramètres que l'on veut utiliser, et la métrics d'évaluations)
+
+#Collecter les metric s
+res <- ridge_cv |>
+  collect_metrics()
+
+#Grpah normale
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() 
+#Graphe à l'échelle logarithmique 
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() + scale_x_log10()
+
+#Sélectionner le lambda avec le meilleur rmse
+lowest_rmse <- ridge_cv |> select_best(metric = "rmse")
+
+#Sélectionner le lambda le plus bas pour RMSE et l'afficher dans notre modèle 
+final_wf <- finalize_workflow(ridge_wf, lowest_rmse)
+
+#Relancer le modèle sur notre jeu de donnée
+final_ridge <- final_wf |>fit(punt2)
+final_ridge |> tidy()
+```
+
+## Exercice
+
+Variables :
+
+-   **SeasonEnd** = année de fin de saison
+
+-   **Playoffs** = variable bianire indiquant si l'équipe passe les playoffs
+
+-   **W** : nombre de match gagnées dans la saison
+
+-   **PTS, oppPTS** : nombre de points marqués et encaissés
+
+-   **FG, FGA** : nombre de paniers réussis et tentés
+
+-   **X2P, X2PA** : nombre à 2 pts réussis et tentés
+
+-   **X3P, X3PA** : nombre à 3 pts réussis et tentés
+
+-   **FT, FTA** : nombre de lancer franc réussis et tentés
+
+-   **ORB, DRB** : nombre de rebond offensif et deféensifs
+
+-   **AST, STL, BLK** : nombres de passes décisives, interceptiosn et contres
+
+-   **TOV** : nombre de turnovers
+
+### Régression classique
+
+RMSE \<- sqrt(mean(lm_predict\$.pred-nba2_test\$PTS)\^2)
+
+```{r}
+library(tidymodels)
+nba <- read.csv("../data/nba/NBA_train.csv", sep = ",")
+nba2 <- nba[,3:20]
+nba2 <- nba2 |> mutate(Playoffs=as.factor(Playoffs))
+nba2 <- nba2[,2:18]
+nba2<- nba2 |> 
+  select(!c("X3P", "X3PA", "FT"))
+
+#Création du modèle 
+lm_model <- linear_reg() |>
+  set_engine("lm") |>  #Préciser le modèle utilisé 
+  set_mode("regression") #Précisé si regréssion ou classification 
+
+#Création du jeu de donéne dans les mesures que l'on veut 
+lm_rec <- recipe(PTS ~ ., data = nba2)  #Préparation des données 
+#   step_center(all_numeric())|> #Convertir les données au bon format 
+#   step_scale(all_numeric())
+
+#Création du worflow (zone ou on va pouvoir ajouter les paramètres du model et le jeu de données)
+lm_wf <- workflow() |> #Mise en place de l'algorithme a
+  add_model(lm_model) |> #Ajouter le modèle que l'on a crée 
+  add_recipe(lm_rec)  #Ajout des données que l'on à préparer 
+
+#Repréciser les données 
+lm_fit <- lm_wf |> 
+  fit(data = nba2)
+
+lm_fit |> glance()
+
+##Affichage des données avec : 
+# Termes du modèles 
+#Coefficient 
+#Sd 
+#Statistivs de tests
+#P.value
+Resultat_classique <- lm_fit |> tidy()
+
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+nba2_test <- nba_test |> mutate(Playoffs=as.factor(Playoffs)) |> select(!c("Team", "Playoffs", "SeasonEnd"))
+
+
+lm_predict <- lm_fit |> predict(new_data=nba2_test)
+#|| 
+
+#Autre facon 
+#R^2
+#AIC
+#BIC
+#lm_fit |> glance()
+
+result <- (lm_predict - nba2_test$PTS)
+RMSE <- sqrt(mean(lm_predict$.pred-nba2_test$PTS)^2)
+
+
+
+```
+
+## Régression RIDGE
+
+```{r}
+ridge_model <- linear_reg() |>
+  set_engine("glmnet") |> #On utilise la package glmnet car cest celui qui perrmet de faire de la régression ridge ou RIDGE
+  set_mode("regression") |>
+  set_args(penalty = tune(), mixture = 0) #Penalty = lambda (on va le tuner), mixture = 0 pour la ridge
+
+#Création du worflow de travail 
+ridge_wf <- workflow() |>
+  add_model(ridge_model) |>
+  add_formula(PTS~.)
+
+#Valdiation croiséee pour trouver le lambda
+nba_cv <- vfold_cv(nba2, v=3) #Permet de stocker les diff blocks qui vont permettre de faire de la validation croisée
+lambda_grid <- grid_regular(penalty(range = c(-100,2)), levels = 100) #Déinir une grille de lambda pour chosiir celui qui sera optimal. On veut une grille optimal. Range = la puissance (ici de 10^-5 à 10^2)
+
+ridge_cv <- ridge_wf |> 
+  tune_grid(resamples =nba_cv, grid = lambda_grid, metrics = metric_set(rmse)) #Ajustement de la grille en utilisant le workflow (on précise dans resamples les échatntillons, on précise la grille de paramètres que l'on veut utiliser, et la métrics d'évaluations)
+
+#Collecter les metric s
+res <- ridge_cv |>
+  collect_metrics()
+
+#Grpah normale
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() 
+#Graphe à l'échelle logarithmique 
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() + scale_x_log10()
+
+#Sélectionner le lambda avec le meilleur rmse
+lowest_rmse <- ridge_cv |> select_best(metric = "rmse")
+
+#Sélectionner le lambda le plus bas pour RMSE et l'afficher dans notre modèle 
+final_wf <- finalize_workflow(ridge_wf, lowest_rmse)
+
+#Relancer le modèle sur notre jeu de donnée
+final_ridge <- final_wf |>fit(nba2)
+final_ridge |> tidy()
+
+resultat_ridge <- final_ridge |> tidy()
+
+Resultat_classique <- lm_fit |> tidy()
+
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+nba2_test <- nba_test |> mutate(Playoffs=as.factor(Playoffs)) |> select(!c("Team", "Playoffs", "SeasonEnd"))
+
+
+lm_predict <- final_ridge |> predict(new_data=nba2_test)
+#|| 
+
+#Autre facon 
+#R^2
+#AIC
+#BIC
+#lm_fit |> glance()
+
+result <- (lm_predict - nba2_test$PTS)
+RMSE <- sqrt(mean(lm_predict$.pred-nba2_test$PTS)^2)
+```
+
+## Régression LASSO
+
+```{r}
+lasso_model <- linear_reg() |>
+  set_engine("glmnet") |> #On utilise la package glmnet car cest celui qui perrmet de faire de la régression ridge ou LASSO
+  set_mode("regression") |>
+  set_args(penalty = tune(), mixture = 1) #Penalty = lambda (on va le tuner), mixture = 1 pour la lasso
+
+#Création du worflow de travail 
+lasso_wf <- workflow() |>
+  add_model(lasso_model) |>
+  add_formula(PTS~.)
+
+#Valdiation croiséee pour trouver le lambda
+nba_cv <- vfold_cv(nba2, v=3) #Permet de stocker les diff blocks qui vont permettre de faire de la validation croisée
+lambda_grid <- grid_regular(penalty(range = c(-2,2)), levels = 100) #Déinir une grille de lambda pour chosiir celui qui sera optimal. On veut une grille optimal. Range = la puissance (ici de 10^-5 à 10^2)
+
+lasso_cv <- lasso_wf |> 
+  tune_grid(resamples =nba_cv, grid = lambda_grid, metrics = metric_set(rmse)) #Ajustement de la grille en utilisant le workflow (on précise dans resamples les échatntillons, on précise la grille de paramètres que l'on veut utiliser, et la métrics d'évaluations)
+
+#Collecter les metric s
+res <- lasso_cv |>
+  collect_metrics()
+
+#Grpah normale
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() 
+#Graphe à l'échelle logarithmique 
+res |> ggplot(aes(penalty, mean, color = .metric)) + geom_line() + scale_x_log10()
+
+#Sélectionner le lambda avec le meilleur rmse
+lowest_rmse <- lasso_cv |> select_best(metric = "rmse")
+
+#Sélectionner le lambda le plus bas pour RMSE et l'afficher dans notre modèle 
+final_wf <- finalize_workflow(lasso_wf, lowest_rmse)
+
+#Relancer le modèle sur notre jeu de donnée
+final_lasso <- final_wf |>fit(nba2)
+final_lasso |> tidy()
+
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+nba2_test <- nba_test |> mutate(Playoffs=as.factor(Playoffs)) |> select(!c("Team", "Playoffs", "SeasonEnd"))
+
+
+lm_predict <- final_lasso |> predict(new_data=nba2_test)
+#|| 
+
+#Autre facon 
+#R^2
+#AIC
+#BIC
+#lm_fit |> glance()
+
+result <- (lm_predict - nba2_test$PTS)
+RMSE <- sqrt(mean(lm_predict$.pred-nba2_test$PTS)^2)
+```
+
+# Régression logistique
+
+\--\> Variable à epxliquer en qualité de **variable binaire** (on cherche donc à estimer la probabilité d'être égale à 1)
+
+-   On utilise le maximum de vraisemblances pour ajuster le modèle.
+
+[Prédiction des playoffs ou non ??]{.underline}
+
+```{r}
+#Import et nettoyage des donénes 
+#Jeux de données1
+library(dplyr)
+library(tidymodels)
+library(ggplot2)
+nba <- read.csv("../data/nba/NBA_train.csv", sep = ",")
+nba_utils <- nba |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_utils$Playoffs <- as.factor(nba_utils$Playoffs)
+
+#Jeux de données de validations
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+nba2_test <- nba_test |> mutate(Playoffs=as.factor(Playoffs)) |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba2_test$Playoffs <- as.factor(nba2_test$Playoffs)
+
+#Création de la régression logistique 
+nba_relog <- glm(Playoffs~., data = nba_utils, family = "binomial")
+
+log_model <- logistic_reg() |> 
+  set_engine("glm") |>
+  set_mode("classification")
+
+#Création de workflow
+log_wf <- workflow() |>
+  add_model(log_model) |>
+  add_formula(Playoffs~.)
+
+#Ajustement du model sur les données 
+log_fit <- log_wf |>
+  fit(data=nba_utils)
+
+#Prédiction
+log_predict <- log_fit |> predict(new_data=nba2_test, type="class")
+
+#Ou pour récupéréer les probas
+log_prob <- log_fit |> predict(new_data=nba2_test, type="prob")
+
+#Afficher le vrai tableau avec notre tableau en comparaison
+nba_tfit <- nba2_test[, "Playoffs"] |> bind_cols(log_predict, log_prob)
+
+confusion <- yardstick::conf_mat(nba_tfit,
+        truth = "...1",
+        estimate= ".pred_class",
+        dnn = c("Prediction", "Truth"))
+
+summary(confusion)
+
+```
+
+![](images/precision_test.png)
+
+Sensibilité : capacité du modèle à bien prédire 1
+
+spécificité : capacité du modèle à bien prédire 0
+
+-   Précision = TP ÷ (TP + FP)
+
+-   Rappel = TP ÷ (TP + FN)
+
+-   F1 = 2 × (Précision × Rappel) ÷ (Précision + Rappel)
+
+### Régresion Logistique lasso
+
+(a rattraper)
+
+```{r}
+lasso_rec <- recipe(Playoffs~.)
+```
+
+# Forets aléatoires
+
+\--\> Famille de prédicteur par moyennes locales
+
+## Méthodes d'optimisations
+
+-   Les K plus proches voisins (problème : définir k avec la validation croisée)
+
+-   Noyau d'approximation (à partir d'une distance maximale défini. Compliqué à mettre en place
+
+-   Partition de l'espace départ
+
+[**Le fléau de la dimension**]{.underline}
+
+Plus la dimension est importante plus la notation de variable perd de son interet (en effet, en ajoutant des dimensions on augmente la taille de la division nécessaire pour couvrir ce que l'on veut)
+
+## La méthode CART
+
+Elle va aboutir à la fin à une partition de l'espace à partir des données
+
+Les éléments de la partition d'un arbre sont appelés les nœuds terminaux ou les feuilles de l'arbre.
+
+Pour effectuer les classes, on va chercher à rendre les classes les plus homogènes possibles à la suite des découpages. (**indice de Gini** pour discrimination binaire et **variance empirique** pour la régression)
+
+Au final, on s''intéresse au noueds finaux (ou terminaux de l'arbre). Cad, les noeuds qui sont à la fin de chaque branche de notre arbre (on ne regarde pas une prédiction si il y a une branche qui en découle.
+
+Echantillon Boostrap (pour le bragging d'arbres (tirés des variables du jeu de données aux hasard et utilisation hasardeuse (1,2,3 ... fois).
+
+La vairante Boostrap de Crt :
+
+Amélioration avec m ou mtry = nb de variables explicatives tirés aux hasard dans les étapes de Cart
+
+## Estimateur Out of Bag du risque de la foret
+
+**Utilsation des individus laissé de coté dans le Boostrap pour évaluer la prédiction :**
+
+Méthode qui permet d'éviter de passer par la validation croisée (qui rajouterai une surcouche et donc du temps de traitement supplémentaires)
+
+On prend tout les individus de la base de données et on regarde les prédicteurs qui ne sont pas utilisés dans l'arbre.
+
+\--\> On peut afin de tester l'importance des variables en transformant les données de out of bag ( de la x variables)
+
+Pour toutes les Erreurs OOB on a : OOB - OOBtrasn) pour l'arbre B
+
+**Foret aléatoire classique (avec random Forest package)**
+
+```{r}
+library(ranger)
+library(randomForest)
+library(dplyr)
+library(tidymodels)
+library(parsnip)
+
+nba_train <- read.csv("../data/nba/NBA_train.csv", sep = ",")
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+
+#Traitemtnt des jeux de données
+nba_train_utils <- nba_train |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_train_utils$Playoffs <- as.factor(nba_train_utils$Playoffs)
+nba_test_utils <- nba_test |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_test_utils$Playoffs <- as.factor(nba_test_utils$Playoffs)
+
+
+rand_forest(mtry = mtry_opt, trees = trees_opt) |> 
+  set_engine("randomForest") |>
+  set_mode("")
+
+
+```
+
+**Foret aléatoire classique (avec ranger)**
+
+```{r}
+rf <- ranger(Playoffs~., nba_train_utils)
+rf$prediction.error
+
+
+#Boucle pour mtry 
+oob = numeric(14)
+for (i in 1:14) {
+  rf <- ranger(Playoffs~., nba_train_utils, mtry = i)
+  oob[i] = rf$prediction.error
+}
+
+oob
+plot(1:14, oob, type="l")
+mtry_opt = which.min(oob)
+
+
+#Utilisation du mtry pour estimer Playoffs dans le jeu de données test
+rf_opt <- ranger(Playoffs~., nba_train_utils, mtry = mtry_opt)
+
+pred <- predict(rf_opt, nba_test_utils)
+pred$predictions
+
+#Calculer le pourcentage de mauvaise prédiction par rapport à test.
+mean(nba_test_utils$Playoffs != pred$predictions)
+
+
+
+```
+
+```{r}
+library(ranger)
+library(randomForest)
+library(dplyr)
+library(tidymodels)
+
+nba_train <- read.csv("../data/nba/NBA_train.csv", sep = ",")
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+#Traitemtnt des jeux de données
+nba_train_utils <- nba_train |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_train_utils$Playoffs <- as.factor(nba_train_utils$Playoffs)
+nba_test_utils <- nba_test |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_test_utils$Playoffs <- as.factor(nba_test_utils$Playoffs)
+
+show_engines("rand_forest")
+
+#Lancer la régression classique 
+rf <- randomForest(Playoffs~., nba_train_utils)
+
+#Aller chercher l'erreur out of bag et plotter les résultats
+rf$err.rate[500,1] 
+
+plot(1:500, rf$err.rate[,1], type = "l", xlab = "nombre d'arbres dans la foret", ylab = "Erreur Rate")
+
+```
+
+### Exercice
+
+```{r}
+library(ranger)
+library(randomForest)
+library(dplyr)
+library(tidymodels)
+library(parsnip)
+library(caret)
+library(mlbench)
+
+nba_train <- read.csv("../data/nba/NBA_train.csv", sep = ",")
+nba_test <- read.csv("../data/nba/NBA_test.csv", sep = ",")
+
+#Traitemtnt des jeux de données
+nba_train_utils <- nba_train |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_train_utils$Playoffs <- as.factor(nba_train_utils$Playoffs)
+nba_test_utils <- nba_test |> select(!c("Team", "SeasonEnd","X3P", "X3PA", "FT"))
+nba_test_utils$Playoffs <- as.factor(nba_test_utils$Playoffs)
+
+
+
+#Défir mtry 
+OOB <- numeric(14)
+for (i in 1:14) {
+  rf <- ranger::ranger(Playoffs~.,data=nba_train_utils,mtry=i)
+  OOB[i]<-rf$prediction.error
+}
+OOB
+plot(1:14,OOB,type="l")
+mtry_opt <- which.min(OOB)
+mtry_opt
+
+
+#OU 
+customRF <- list(type = "Classification", library = "randomForest", loop = NULL)
+
+customRF$parameters <- data.frame(parameter = c("mtry", "ntree"), class = rep("numeric", 2), label = c("mtry", "ntree"))
+
+customRF$grid <- function(x, y, len = NULL, search = "grid") {}
+customRF$fit <- function(x, y, wts, param, lev, last, weights, classProbs, ...) {
+  randomForest(x, y, mtry = param$mtry, ntree=param$ntree, ...)
+}
+customRF$predict <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+   predict(modelFit, newdata)
+customRF$prob <- function(modelFit, newdata, preProc = NULL, submodels = NULL)
+   predict(modelFit, newdata, type = "prob")
+customRF$sort <- function(x) x[order(x[,1]),]
+customRF$levels <- function(x) x$classes
+
+
+
+control <- trainControl(method="repeatedcv", number=5, repeats=40, search = "random")
+
+seed <- 7
+metric <- "Accuracy"
+set.seed(seed)
+
+mtry <- sqrt(ncol(nba_train_utils))
+tunegrid <- expand.grid(.mtry= c(1:14), .ntree = c(100, 200, 300, 400, 500))
+
+rf_default <- train(Playoffs~., data=nba_train_utils, method=customRF, metric=metric, tuneGrid=tunegrid, trControl=control)
+
+print(rf_default)
+plot(rf_default)
+
+#Définir trees_opt
+#rf_rec <- recipe(Playoffs ~ ., data = nba_train_utils)
+
+#rf_spec <- rand_forest() %>%
+  # set_mode("classification") %>%
+  # set_engine("randomForest")
+
+#rf_workflow <- workflow() |>
+  #add_recipe(rf_rec) |>
+  #add_model(rf_spec)
+
+####A compléter
+```
+
+### 
