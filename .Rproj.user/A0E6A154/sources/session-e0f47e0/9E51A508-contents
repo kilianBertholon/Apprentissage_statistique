@@ -9,17 +9,17 @@ output: html_document
 
 ```{r librairies}
 
+library(reshape2)
+library(ggplot2)
+library(plotly)
+library(dplyr)
 ```
 
 ## Import des données
 
 ```{r import données}
-data_2000_2018 <- read.csv("./data/Datasets/final_dataset.csv")
-data_2018_2019 <- read.csv("./data/Datasets/2018-19.csv")
-data_2019_2020 <- read.csv("./data/Datasets/2019-20.csv")
-data_2020_2021 <- read.csv("./data/2020-2021.csv")
-data_2021_2022 <- read.csv("./data/2021-2022.csv")
-classement <- read.csv("./data/Datasets/EPLStandings.csv")
+Dataset_stat <- read.csv('./data/fichier_globale.csv')
+classement_ini <- read.csv("./data/EPLStandings.csv")
 ```
 
 ## Liste des abréviations de variables 
@@ -232,4 +232,31 @@ B365AHA = Bet365 Handicap asiatique équipe à l'extérieur cote
 
 B365AH = Bet365 taille du handicap (équipe locale)
 
+## Préparation des données 
+
+#### Classement finale
+
+```{r}
+#Réorganiser les données
+Classement <- melt(classement_ini, id.vars = "Team", variable.name = "X", value.name = "Resultat")
+
+#Renommez les colonnes
+colnames(Classement) <- c("Equipe","Annee","Resultat")
+
+# Supprimer le "X" de la colonne "Annee"
+Classement$Annee <- as.numeric(sub("X", "", Classement$Annee))
+```
+
+#### Data statistique 
+
 ## Analyse descriptive des données
+
+```{r classement affichage}
+plot_ly(data = Classement, x = ~Annee, y = ~Resultat, color = ~Equipe, type = 'scatter', mode = 'lines+markers',
+        legendgroup = ~Equipe) %>%
+  layout(title = "Classement des équipes par année",
+         xaxis = list(title = "Année"),
+         yaxis = list(title = "Classement", autorange = "reversed"),  # Inverser l'axe y
+         showlegend = TRUE) %>%
+  config(displayModeBar = FALSE)
+```
