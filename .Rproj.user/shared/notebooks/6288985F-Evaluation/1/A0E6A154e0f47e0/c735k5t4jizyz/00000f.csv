@@ -1,2 +1,0 @@
-"0","Dataset_stat <- read.csv('./data/fichier_globale.csv')"
-"0","classement_ini <- read.csv(""./data/EPLStandings.csv"")"

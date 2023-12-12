@@ -1,6 +1,0 @@
-"0","data_2000_2018 <- read.csv(""./data/Datasets/final_dataset.csv"")"
-"0","data_2018_2019 <- read.csv(""./data/Datasets/2018-19.csv"")"
-"0","data_2019_2020 <- read.csv(""./data/Datasets/2019-20.csv"")"
-"0","data_2020_2021 <- read.csv(""./data/2020-2021.csv"")"
-"0","data_2021_2022 <- read.csv(""./data/2021-2022.csv"")"
-"0","classement_ini <- read.csv(""./data/Datasets/EPLStandings.csv"")"

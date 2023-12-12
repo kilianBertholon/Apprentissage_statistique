@@ -1,8 +1,0 @@
-"0","#Réorganiser les données"
-"0","Classement <- melt(classement_ini, id.vars = ""Team"", variable.name = ""X"", value.name = ""Resultat"")"
-"0",""
-"0","#Renommez les colonnes"
-"0","colnames(Classement) <- c(""Equipe"",""Annee"",""Resultat"")"
-"0",""
-"0","# Supprimer le ""X"" de la colonne ""Annee"""
-"0","Classement$Annee <- as.numeric(sub(""X"", """", Classement$Annee))"
