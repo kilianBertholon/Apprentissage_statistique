@@ -78,6 +78,8 @@ library(jsonlite)
 library(tidyr)
 library(ggplot2)
 library(dplyr)
+library(corrplot)
+library(ggraph)
 
 ```
 
@@ -122,7 +124,9 @@ summary(all_data)
 
 ## Etape 3 : Première analyses visuelles sur les données
 
-### a) Répartition par postes 
+### Analyse des distributions variables apr variables 
+
+#### a) Répartition par postes 
 
 ```{r}
 
@@ -145,7 +149,7 @@ Distri_postes
 
 ```
 
-### b) Age
+#### b) Age
 
 ```{r}
 # Créez un histogramme de l'âge
@@ -154,7 +158,7 @@ ggplot(all_data, aes(x = Age)) +
   labs(title = "Distribution de l'âge des joueurs", x = "Âge", y = "Fréquence")
 ```
 
-### c) But
+#### c) But
 
 ```{r}
 
@@ -171,7 +175,7 @@ print(Distri_but_Poste)
 
 ```
 
-### d) Passes décisives 
+#### d) Passes décisives 
 
 ```{r}
 # Créez un boxplot pour la distribution des passes décisives en fonction du poste global
@@ -181,7 +185,7 @@ ggplot(all_data, aes(x = Poste_globale, y = PasseDecisive, fill = Poste_globale)
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### e) Minutes jouées
+#### e) Minutes jouées
 
 ```{r}
 Min_joue_poste<- ggplot(all_data, aes(x = Poste_globale, y = minJ, fill = Poste_globale)) +
@@ -194,7 +198,7 @@ Min_joue_poste<- ggplot(all_data, aes(x = Poste_globale, y = minJ, fill = Poste_
 print(Min_joue_poste)
 ```
 
-### f) Apparitions 
+#### f) Apparitions 
 
 ```{r}
 # Créez un boxplot pour la distribution des passes décisives en fonction du poste global
@@ -204,7 +208,7 @@ ggplot(all_data, aes(x = Poste_globale, y = Apparences, fill = Poste_globale)) +
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### g) Note
+#### g) Note
 
 ```{r}
 
@@ -216,7 +220,7 @@ ggplot(all_data, aes(x = Poste_globale, y = Note, fill = Poste_globale)) +
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### h) Tirs
+#### h) Tirs
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = Tirs, fill = Poste_globale)) +
@@ -225,7 +229,7 @@ ggplot(all_data, aes(x = Poste_globale, y = Tirs, fill = Poste_globale)) +
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### i) Dribbles
+#### i) Dribbles
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = Dribbles , fill = Poste_globale)) +
@@ -234,7 +238,7 @@ ggplot(all_data, aes(x = Poste_globale, y = Dribbles , fill = Poste_globale)) +
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### j) Passes Pourcentages
+#### j) Passes Pourcentages
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = Passes_perc , fill = Poste_globale)) +
@@ -243,7 +247,7 @@ ggplot(all_data, aes(x = Poste_globale, y = Passes_perc , fill = Poste_globale))
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### k) Moyenne passe clé
+#### k) Moyenne passe clé
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = moy_passes , fill = Poste_globale)) +
@@ -252,7 +256,7 @@ ggplot(all_data, aes(x = Poste_globale, y = moy_passes , fill = Poste_globale)) 
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### l) Centre pourcentage
+#### l) Centre pourcentage
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = centre_perc , fill = Poste_globale)) +
@@ -261,7 +265,7 @@ ggplot(all_data, aes(x = Poste_globale, y = centre_perc , fill = Poste_globale))
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### m) Dégagement
+#### m) Dégagement
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = degagement , fill = Poste_globale)) +
@@ -276,7 +280,7 @@ On voit que tout les boxplots quelque soit le poste sont situées à 0. Cela sig
 all_data <- subset(all_data, select = -degagement)
 ```
 
-### n) Interception 
+#### n) Interception 
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = interception , fill = Poste_globale)) +
@@ -285,7 +289,7 @@ ggplot(all_data, aes(x = Poste_globale, y = interception , fill = Poste_globale)
   scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
 ```
 
-### o) Tacles recus
+#### o) Tacles recus
 
 ```{r}
 Tacles<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_globale)) +
@@ -298,7 +302,7 @@ Tacles<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_gl
 print(Tacles)
 ```
 
-### p) Tir bloques
+#### p) Tirs bloques
 
 ```{r}
 Tir_bloques<- ggplot(all_data, aes(x = Poste_globale, y = tirsBloques, fill = Poste_globale)) +
@@ -311,7 +315,7 @@ Tir_bloques<- ggplot(all_data, aes(x = Poste_globale, y = tirsBloques, fill = Po
 print(Tir_bloques)
 ```
 
-### q)  Dribles subis
+#### q)  Dribles subis
 
 ```{r}
 Dribles_subis<- ggplot(all_data, aes(x = Poste_globale, y = driblesSubis, fill = Poste_globale)) +
@@ -324,7 +328,7 @@ Dribles_subis<- ggplot(all_data, aes(x = Poste_globale, y = driblesSubis, fill =
 print(Dribles_subis)
 ```
 
-### r) Fautes commises moyennes par match
+#### r) Fautes commises moyennes par match
 
 ```{r}
 Fautes_postes<- ggplot(all_data, aes(x = Poste_globale, y = fautes, fill = Poste_globale)) +
@@ -337,7 +341,7 @@ Fautes_postes<- ggplot(all_data, aes(x = Poste_globale, y = fautes, fill = Poste
 print(Fautes_postes)
 ```
 
-### s) Tacles recu 
+#### s) Tacles recu 
 
 ```{r}
 Tacles_postes<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_globale)) +
@@ -350,7 +354,7 @@ Tacles_postes<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = P
 print(Tacles_postes)
 ```
 
-### t) Hors jeu 
+#### t) Hors jeu 
 
 ```{r}
 Hors_jeu_poste<- ggplot(all_data, aes(x = Poste_globale, y = HorsJeu, fill = Poste_globale)) +
@@ -369,7 +373,7 @@ On voit ici que les Hors jeu sont nul pour chacunes des modalités. On peut donc
 all_data <- subset(all_data, select = -HorsJeu)
 ```
 
-### u) Annee
+#### u) Annee
 
 ```{r}
 table_annee <- data.frame(table(all_data$Annee))
@@ -385,3 +389,22 @@ print(obs_annee)
 ```
 
 ### 
+
+### Analyse des corrélations globales
+
+```{r}
+
+# Supposons que votre dataframe s'appelle "votre_dataframe"
+# Sélectionner seulement les colonnes avec des variables quantitatives
+variables_quantitatives <- all_data %>%
+  select_if(is.numeric)
+
+variables_quantitatives <- na.omit(variables_quantitatives)
+
+# Calculer la matrice de corrélation
+matrice_correlation <- cor(variables_quantitatives, use = "complete.obs")
+
+# Afficher une heatmap avec corrplot
+corrplot(matrice_correlation, method = "color", type = "lower", diag = FALSE, col = COL2('RdYlBu', 10))
+ggraph(cor(matrice_correlation))
+```
