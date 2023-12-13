@@ -5,6 +5,72 @@ date: "2023-11-16"
 output: html_document
 ---
 
+# Projet Apprentissage statistique 
+
+Fontaine Aymeric
+
+Tavian Mattéo
+
+Bertholon Kilian
+
+## Etape 1 : Explication sur les données traitées.
+
+Nous avons choisi de travailler sur des données de football. Ne trouvant pas de jeu de données intéresant. Nous avons donc choisi décider de web-scrapper des données issus d'un site Internet. Nous avons décidé de travailé sur le site : <https://redscores.com/fr/football-stats>.
+
+A l'aide d'un code Javascript construit pour cela nous avons pu récupérer les données issues de 42000 joueurs sur plus de 5 saisons (sur les 10 plus grands championnats mondiaux ainsi que 5 championnat de 2ème division.
+
+Le code Javascript est disponible dans le dossier code Javascript.
+
+Pour chacun des joueurs on dispose d'informations sur ses performances au court de l'année :
+
+-   Son nom
+
+-   Son poste
+
+-   Son club
+
+-   Son Age
+
+-   Le nombre de Minutes jouées dans l'années
+
+-   Le nombre d'apparitions (en match)
+
+-   Le nombre de but qu'il a inscrit
+
+-   Le nombre de passe décisive qu'il a délivré
+
+-   Sa note moyenne sur l'ensemble de l'année
+
+-   Le nombre de tirs moyen par match
+
+-   Le nombre de dribbles moyen par match
+
+-   Le pourcentage de passes réussis par match
+
+-   La moyenne de passe clé par match
+
+-   Le pourcentage de centre réussis
+
+-   Le nombre de dégagemetn par match
+
+-   Le nombre d'interception moyen par match
+
+-   Le nombre de tacle moyen par match
+
+-   Le nombre de Tir bloqués moyen par match
+
+-   Le nombre de dribbles subis moyen par match
+
+-   Le nombre de fautes moyen par match
+
+-   Le nombre de tacles moyen recu par match
+
+-   Le nombre de Hors-jeu moyen par match
+
+-   L'année de références des stastiques
+
+## Etape 2 : Import des données et Pré-traitement
+
 ```{r}
 #### Chargement des packages ####
 
@@ -13,8 +79,9 @@ library(tidyr)
 library(ggplot2)
 library(dplyr)
 
+```
 
-
+```{r}
 
 year_available <- 2019:2023
 
@@ -52,3 +119,269 @@ all_data <- rbind(data_2023, data_2022, data_2021, data_2020, data_2019)
 summary(all_data)
 
 ```
+
+## Etape 3 : Première analyses visuelles sur les données
+
+### a) Répartition par postes 
+
+```{r}
+
+all_data <- all_data %>%
+  mutate(Poste_globale = case_when(
+    Poste %in% c("AM", "CF", "LW", "RW") ~ "Attaquant",
+    Poste %in% c("CB", "DF", "LB", "RB") ~ "Défenseur",
+    Poste %in% c("CM", "DM", "LM", "MF", "RM") ~ "Milieu",
+    Poste == "GK" ~ "Gardien",
+    Poste == '' ~ NA,
+    TRUE ~ "Autre"
+  ))
+Distri_postes <- ggplot(all_data, aes(x = Poste_globale)) +
+  geom_bar(fill = "skyblue", color = "black") +
+  labs(title = "Distribution des postes des joueurs de foot",
+       x = "Poste",
+       y = "Nombre de joueurs")
+Distri_postes
+
+
+```
+
+### b) Age
+
+```{r}
+# Créez un histogramme de l'âge
+ggplot(all_data, aes(x = Age)) +
+  geom_histogram(binwidth = 1, fill = "cyan", color = "black", alpha = 0.7) +
+  labs(title = "Distribution de l'âge des joueurs", x = "Âge", y = "Fréquence")
+```
+
+### c) But
+
+```{r}
+
+all_data$Poste_globale <- factor(all_data$Poste_globale, levels = c("Gardien", "Défenseur", "Milieu", "Attaquant", "NA"))
+Distri_but_Poste<- ggplot(all_data, aes(x = Poste_globale, y = But)) +
+  geom_boxplot(fill = "skyblue", color = "black") +  # Utiliser un boxplot pour la distribution
+  labs(title = "Distribution des buts par poste global",
+       x = "Poste Global",
+       y = "Buts")
+
+# Afficher le graphique
+print(Distri_but_Poste)
+
+
+```
+
+### d) Passes décisives 
+
+```{r}
+# Créez un boxplot pour la distribution des passes décisives en fonction du poste global
+ggplot(all_data, aes(x = Poste_globale, y = PasseDecisive, fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des passes décisives en fonction du poste global", x = "Poste global", y = "Passe décisives") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### e) Minutes jouées
+
+```{r}
+Min_joue_poste<- ggplot(all_data, aes(x = Poste_globale, y = minJ, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Distribution des Minutes jouées par poste ",
+       x = "Poste ",
+       y = "Minutes jouées")
+
+# Afficher le graphique
+print(Min_joue_poste)
+```
+
+### f) Apparitions 
+
+```{r}
+# Créez un boxplot pour la distribution des passes décisives en fonction du poste global
+ggplot(all_data, aes(x = Poste_globale, y = Apparences, fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des apparitions des joueurs en fonction du poste global", x = "Poste global", y = "Apparitions") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### g) Note
+
+```{r}
+
+
+# Créez un boxplot pour la distribution des passes décisives en fonction du poste global
+ggplot(all_data, aes(x = Poste_globale, y = Note, fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des notes des joueurs en fonction du poste global", x = "Poste global", y = "Note") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### h) Tirs
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = Tirs, fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des tirs des joueurs en fonction du poste global", x = "Poste global", y = "Tirs") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### i) Dribbles
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = Dribbles , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des dribbles des joueurs en fonction du poste global", x = "Poste global", y = "Dribbles") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### j) Passes Pourcentages
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = Passes_perc , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des pourcentages de passes réussies des joueurs en fonction du poste global", x = "Poste global", y = "Pourcentage de passes réussies") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### k) Moyenne passe clé
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = moy_passes , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des moyennes des passes clées des joueurs en fonction du poste global", x = "Poste global", y = "Moyenne de passes clées par match") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### l) Centre pourcentage
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = centre_perc , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des pourcentages de centres réussies des joueurs en fonction du poste global", x = "Poste global", y = "Pourcentage de centres réussis") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### m) Dégagement
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = degagement , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des dégagements des joueurs en fonction du poste global", x = "Poste global", y = "Dégagements") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+On voit que tout les boxplots quelque soit le poste sont situées à 0. Cela signifie que toute la colonne "degagement" du jeu de données est constituée de 0. Cette variable n'est donc pas nécessaire, on peut la supprimer.
+
+```{r}
+all_data <- subset(all_data, select = -degagement)
+```
+
+### n) Interception 
+
+```{r}
+ggplot(all_data, aes(x = Poste_globale, y = interception , fill = Poste_globale)) +
+  geom_boxplot() +
+  labs(title = "Distribution des interceptions des joueurs en fonction du poste global", x = "Poste global", y = "interception") +
+  scale_fill_brewer(palette = "Set3")  # Vous pouvez changer la palette de couleurs selon vos préférences
+```
+
+### o) Tacles recus
+
+```{r}
+Tacles<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Tacles recus par postes",
+       x = "Postes ",
+       y = "Tacles recus")
+
+# Afficher le graphique
+print(Tacles)
+```
+
+### p) Tir bloques
+
+```{r}
+Tir_bloques<- ggplot(all_data, aes(x = Poste_globale, y = tirsBloques, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Tirs bloqués par par postes",
+       x = "Postes ",
+       y = "Tirs bloqués")
+
+# Afficher le graphique
+print(Tir_bloques)
+```
+
+### q)  Dribles subis
+
+```{r}
+Dribles_subis<- ggplot(all_data, aes(x = Poste_globale, y = driblesSubis, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Dribles subis par par postes",
+       x = "Postes ",
+       y = "Dribles Subis")
+
+# Afficher le graphique
+print(Dribles_subis)
+```
+
+### r) Fautes commises moyennes par match
+
+```{r}
+Fautes_postes<- ggplot(all_data, aes(x = Poste_globale, y = fautes, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Fautes par postes",
+       x = "Postes",
+       y = "Fautes moyenne par match")
+
+# Afficher le graphique
+print(Fautes_postes)
+```
+
+### s) Tacles recu 
+
+```{r}
+Tacles_postes<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Tacles recu par postes",
+       x = "Poste ",
+       y = "Tacles recu")
+
+# Afficher le graphique
+print(Tacles_postes)
+```
+
+### t) Hors jeu 
+
+```{r}
+Hors_jeu_poste<- ggplot(all_data, aes(x = Poste_globale, y = HorsJeu, fill = Poste_globale)) +
+  geom_boxplot() +  # Utiliser un boxplot pour la distribution
+  labs(title = "Hors jeu par postes",
+       x = "Poste ",
+       y = "Hors jeu")
+
+# Afficher le graphique
+print(Hors_jeu_poste)
+```
+
+On voit ici que les Hors jeu sont nul pour chacunes des modalités. On peut donc substituer cette colonne dans le cas ou nos données ne seront pas completées par de nouvelles données comportant des hors-jeu
+
+```{r}
+all_data <- subset(all_data, select = -HorsJeu)
+```
+
+### u) Annee
+
+```{r}
+table_annee <- data.frame(table(all_data$Annee))
+
+obs_annee <- ggplot(table_annee, aes(x = Var1, y = Freq)) +
+  geom_bar(stat = "identity", fill = "skyblue", color = "black") +
+  labs(title = "Observation par années",
+       x = "Année",
+       y = "Observations")
+
+# Afficher le graphique
+print(obs_annee)
+```
+
+### 
