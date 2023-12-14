@@ -5,7 +5,7 @@ date: "2023-11-16"
 output: html_document
 ---
 
-# Projet Apprentissage statistique 
+# Projet Apprentissage statistique
 
 Fontaine Aymeric
 
@@ -124,9 +124,9 @@ summary(all_data)
 
 ## Etape 3 : Première analyses visuelles sur les données
 
-### Analyse des distributions variables apr variables 
+### Analyse des distributions variables apr variables
 
-#### a) Répartition par postes 
+#### a) Répartition par postes
 
 ```{r}
 
@@ -175,7 +175,7 @@ print(Distri_but_Poste)
 
 ```
 
-#### d) Passes décisives 
+#### d) Passes décisives
 
 ```{r}
 # Créez un boxplot pour la distribution des passes décisives en fonction du poste global
@@ -198,7 +198,7 @@ Min_joue_poste<- ggplot(all_data, aes(x = Poste_globale, y = minJ, fill = Poste_
 print(Min_joue_poste)
 ```
 
-#### f) Apparitions 
+#### f) Apparitions
 
 ```{r}
 # Créez un boxplot pour la distribution des passes décisives en fonction du poste global
@@ -280,7 +280,7 @@ On voit que tout les boxplots quelque soit le poste sont situées à 0. Cela sig
 all_data <- subset(all_data, select = -degagement)
 ```
 
-#### n) Interception 
+#### n) Interception
 
 ```{r}
 ggplot(all_data, aes(x = Poste_globale, y = interception , fill = Poste_globale)) +
@@ -315,7 +315,7 @@ Tir_bloques<- ggplot(all_data, aes(x = Poste_globale, y = tirsBloques, fill = Po
 print(Tir_bloques)
 ```
 
-#### q)  Dribles subis
+#### q) Dribles subis
 
 ```{r}
 Dribles_subis<- ggplot(all_data, aes(x = Poste_globale, y = driblesSubis, fill = Poste_globale)) +
@@ -341,7 +341,7 @@ Fautes_postes<- ggplot(all_data, aes(x = Poste_globale, y = fautes, fill = Poste
 print(Fautes_postes)
 ```
 
-#### s) Tacles recu 
+#### s) Tacles recu
 
 ```{r}
 Tacles_postes<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = Poste_globale)) +
@@ -354,7 +354,7 @@ Tacles_postes<- ggplot(all_data, aes(x = Poste_globale, y = TaclesRecu, fill = P
 print(Tacles_postes)
 ```
 
-#### t) Hors jeu 
+#### t) Hors jeu
 
 ```{r}
 Hors_jeu_poste<- ggplot(all_data, aes(x = Poste_globale, y = HorsJeu, fill = Poste_globale)) +
@@ -406,5 +406,17 @@ matrice_correlation <- cor(variables_quantitatives, use = "complete.obs")
 
 # Afficher une heatmap avec corrplot
 corrplot(matrice_correlation, method = "color", type = "lower", diag = FALSE, col = COL2('RdYlBu', 10))
-ggraph(cor(matrice_correlation))
+
 ```
+
+## Etape 4 : Identification des probématiques potentielles : 
+
+Dans le cadre du footbal, plusieurs problématiques peuvent se poser devant nous avec les données dont nous disposons :
+
+1) Essayer de calculer la note des joueurs à partir de leurs statistiques
+
+2) Essayer d'identifier des performances futures à partir des performances passées
+
+3) Essayer de confirmer des choix de l'entraineurs (visualisables à partir de apparitions et des minutes jouées)
+
+4) Essayer d'identifier des critères de performances pour chacuns des postes
