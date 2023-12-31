@@ -533,3 +533,100 @@ lm_att_fit <- lm_att_wf |>
 resultat_att <- lm_att_fit |> tidy()
 resultat_model_att <- lm_att_fit |> glance()
 ```
+
+On voit que nos modèles qui contiennent beaucoup de données ne semble pas avoir un ajustement linéaire important. Nous possédons beaucoup de variables donc nous allons essayer d'utiliser la méthode Back-forward pour supprimer des données tant que toutes ne sont pas significatives dans l'explication de la note
+
+### Back-forward
+
+```{r}
+data_gardien <-Gardien |> select(c("Note","Age", "minJ", "Apparences", "Passes_perc", "moy_passes", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+##Variables à enlever
+#But
+#Passes décisives
+# Dribbles
+#Centres
+#Interception
+#Tacles
+
+# Création du jeu 
+lm_gardien_rec <- recipe(Note ~ ., data = data_gardien)
+#Zone de workflow
+lm_gardien_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_gardien_rec)
+
+lm_gardien_fit <- lm_gardien_wf |>
+  fit(data = data_gardien)
+
+resultat_gard <- lm_gardien_fit |> tidy()
+resultat_model_gard <- lm_gardien_fit |> glance()
+
+
+
+#####Defenseur
+data_def <-Defenseur |> select(c("Note","Age", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+##Variable enlever 
+# Pourcentages de centres reussis
+
+# Création du jeu 
+lm_def_rec <- recipe(Note ~ ., data = data_def)
+#Zone de workflow
+lm_def_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_def_rec)
+
+lm_def_fit <- lm_def_wf |>
+  fit(data = data_def)
+
+resultat_def <- lm_def_fit |> tidy()
+resultat_model_def <- lm_def_fit |> glance()
+
+
+#####Milieu
+data_mil <-Milieu |> select(c("Note", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+##Variables à retirer 
+#Age
+
+# Création du jeu 
+lm_mil_rec <- recipe(Note ~ ., data = data_mil)
+#Zone de workflow
+lm_mil_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_mil_rec)
+
+lm_mil_fit <- lm_mil_wf |>
+  fit(data = data_mil)
+
+resultat_mil <- lm_mil_fit |> tidy()
+resultat_model_mil <- lm_mil_fit |> glance()
+
+
+
+#####Attaquant
+data_att <-Attaquant |> select(c("Note", "minJ", "Apparences", "But", "PasseDecisive", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "TaclesRecu"))
+
+##Variabels à retirer 
+#Age
+#Dribbles
+#fautes
+
+# Création du jeu 
+lm_att_rec <- recipe(Note ~ ., data = data_att)
+#Zone de workflow
+lm_att_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_att_rec)
+
+lm_att_fit <- lm_att_wf |>
+  fit(data = data_att)
+
+resultat_att <- lm_att_fit |> tidy()
+resultat_model_att <- lm_att_fit |> glance()
+```
+
+### Applicatiions des modèles pour la prédictions
+
+Nos modèles utilisant la régression linéaire multiples ne contiennet que des variables significativement utiles. Nous allons donc essayer de les utiliser pour la prédictions
