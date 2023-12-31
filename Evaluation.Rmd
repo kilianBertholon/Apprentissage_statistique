@@ -80,6 +80,7 @@ library(ggplot2)
 library(dplyr)
 library(corrplot)
 library(ggraph)
+library(tidymodels)
 
 ```
 
@@ -409,14 +410,126 @@ corrplot(matrice_correlation, method = "color", type = "lower", diag = FALSE, co
 
 ```
 
-## Etape 4 : Identification des probématiques potentielles : 
+## Etape 4 : Identification des probématiques potentielles :
 
 Dans le cadre du footbal, plusieurs problématiques peuvent se poser devant nous avec les données dont nous disposons :
 
-1) Essayer de calculer la note des joueurs à partir de leurs statistiques
+1)  Essayer de calculer la note des joueurs à partir de leurs statistiques
 
-2) Essayer d'identifier des performances futures à partir des performances passées
+2)  Essayer d'identifier des performances futures à partir des performances passées
 
-3) Essayer de confirmer des choix de l'entraineurs (visualisables à partir de apparitions et des minutes jouées)
+3)  Essayer de confirmer des choix de l'entraineurs (visualisables à partir de apparitions et des minutes jouées)
 
-4) Essayer d'identifier des critères de performances pour chacuns des postes
+4)  Essayer d'identifier des critères de performances pour chacuns des postes
+
+# 1) Note des joueurs
+
+Le site sur lesquel nous avons recolté nos données permet d'obtenir les notes de chaque joueurs. Nous aimerions pouvoir recalculer les notes de chacun des joueurs à partir de leurs statistiques.
+
+Cependant, nos connaissances de la disciplines nous indiquent que les notes des joueurs à partir des statistiques seront dépendantes du postes (un attaquant qui effectue plus de tirs sera avantagé car c'est ce qu'on lui demande)
+
+L'ensemble de nos variables sont quantitatives : Nous allons donc pouvoir essayer plusieurs modèles différents afin d'estimer aux plus justes les notes des joueurs.
+
+Dans un premier temps, il va donc falloir préparer nos données pour rassembler les joueurs par postes
+
+## Pré-traitement des données
+
+### Rassembler les joueurs par postes
+
+```{r}
+
+Gardien <- all_data |> filter(Poste_globale == "Gardien")
+Defenseur <- all_data |> filter(Poste_globale == "Défenseur")
+Milieu <- all_data |> filter(Poste_globale == "Milieu")
+Attaquant <- all_data |> filter(Poste_globale == "Attaquant")
+
+```
+
+### Etudier la distribution des notes par postes
+
+```{r}
+density <- ggplot(all_data, aes(Note, color = Poste_globale)) + geom_density()
+density
+```
+
+On semble plutot suivre une loin normale sur chacun des notes des différents postes
+
+## Regression linéaires multiples
+
+```{r}
+
+#Création du modèle
+lm_model <- linear_reg() |>
+  set_engine("lm") |>
+  set_mode("regression")
+
+
+####Gardien ######
+data_gardien <-Gardien |> select(c("Note","Age", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+# Création du jeu 
+lm_gardien_rec <- recipe(Note ~ ., data = data_gardien)
+#Zone de workflow
+lm_gardien_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_gardien_rec)
+
+lm_gardien_fit <- lm_gardien_wf |>
+  fit(data = data_gardien)
+
+resultat_gard <- lm_gardien_fit |> tidy()
+resultat_model_gard <- lm_gardien_fit |> glance()
+
+
+
+#####Defenseur
+data_def <-Defenseur |> select(c("Note","Age", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+# Création du jeu 
+lm_def_rec <- recipe(Note ~ ., data = data_def)
+#Zone de workflow
+lm_def_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_def_rec)
+
+lm_def_fit <- lm_def_wf |>
+  fit(data = data_def)
+
+resultat_def <- lm_def_fit |> tidy()
+resultat_model_def <- lm_def_fit |> glance()
+
+
+#####Milieu
+data_mil <-Milieu |> select(c("Note","Age", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+# Création du jeu 
+lm_mil_rec <- recipe(Note ~ ., data = data_mil)
+#Zone de workflow
+lm_mil_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_mil_rec)
+
+lm_mil_fit <- lm_mil_wf |>
+  fit(data = data_mil)
+
+resultat_mil <- lm_mil_fit |> tidy()
+resultat_model_mil <- lm_mil_fit |> glance()
+
+
+
+#####Attaquant
+data_att <-Attaquant |> select(c("Note","Age", "minJ", "Apparences", "But", "PasseDecisive", "Dribbles", "Passes_perc", "moy_passes", "centre_perc", "interception", "tacle", "tirsBloques", "driblesSubis", "fautes", "TaclesRecu"))
+
+# Création du jeu 
+lm_att_rec <- recipe(Note ~ ., data = data_att)
+#Zone de workflow
+lm_att_wf <- workflow() |> 
+  add_model(lm_model) |>
+  add_recipe(lm_att_rec)
+
+lm_att_fit <- lm_att_wf |>
+  fit(data = data_att)
+
+resultat_att <- lm_att_fit |> tidy()
+resultat_model_att <- lm_att_fit |> glance()
+```
