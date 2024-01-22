@@ -81,6 +81,10 @@ library(dplyr)
 library(corrplot)
 library(ggraph)
 library(tidymodels)
+library(xgboost)
+library(doParallel)
+library(vip)
+
 
 ```
 
@@ -454,7 +458,98 @@ density
 
 On semble plutot suivre une loin normale sur chacun des notes des différents postes
 
-## 
+## Utilisation des différents algorithmes
+
+### a) XGBoost
+
+```{r}
+
+
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+
+
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = all_data_xg) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.8, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+xgb_model <- boost_tree(
+  trees = 1000,
+  tree_depth = tune(), min_n = tune(),
+  loss_reduction = tune(),                  
+  sample_size = tune(), mtry = tune(),         
+  learn_rate = tune()                          
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+xgb_grid <- grid_latin_hypercube(
+  tree_depth(),
+  min_n(),
+  loss_reduction(),
+  sample_size = sample_prop(),
+  finalize(mtry(), data_train),
+  learn_rate(),
+  size = 30
+)
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+set.seed(123)
+play_samples_cv <- vfold_cv(data_test,v=5,repeats=1,strata="Note")
+
+doParallel::registerDoParallel()
+
+set.seed(234)
+xgb_res <- tune_grid(
+  xgb_wf,
+  resamples = play_samples_cv,
+  grid = xgb_grid,
+  control = control_grid(save_pred = TRUE)
+)
+
+collect_metrics(xgb_res)
+
+xgb_res %>%
+  collect_metrics() %>%
+  filter(.metric == "rsq") %>%
+  select(mean, mtry:sample_size) %>%
+  pivot_longer(mtry:sample_size,
+               values_to = "value",
+               names_to = "parameter"
+  ) %>%
+  ggplot(aes(value, mean, color = parameter)) +
+  geom_point(alpha = 0.8, show.legend = FALSE) +
+  facet_wrap(~parameter, scales = "free_x") +
+  labs(x = NULL, y = "rsq")
+
+show_best(xgb_res, "rmse")
+best_rsq <- select_best(xgb_res, "rmse")
+
+final_xgb <- finalize_workflow(xgb_wf, best_rsq)
+
+final_xgb %>%
+  fit(data = data_train) %>%
+  pull_workflow_fit() %>%
+  vip(geom = "point")
+
+final_res <- last_fit(final_xgb, data_split)
+print(collect_metrics(final_res))
+```
+
+### b) Random Forest
 
 ### 
 
