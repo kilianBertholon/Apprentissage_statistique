@@ -84,6 +84,7 @@ library(tidymodels)
 library(xgboost)
 library(doParallel)
 library(vip)
+library(plotly)
 
 
 ```
@@ -463,25 +464,23 @@ On semble plutot suivre une loin normale sur chacun des notes des différents po
 ### a) XGBoost
 
 ```{r}
-
-
+all_data <- all_data |> filter(Poste_globale == "Attaquant")
 all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
 all_data_xg <- na.omit(all_data_xg, cols = "Note")
 
-
-
-
-#Préparation des données 
-variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
-recipe_xg <- recipe(Note ~ ., data = all_data_xg) |>
-  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
-  step_normalize(all_predictors())
 
 #Diviser en entrainement et test
 set.seed(123)
 data_split <- initial_split(all_data_xg, prop = 0.8, strata = Note)
 data_train <- training(data_split)
 data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
 
 xgb_model <- boost_tree(
   trees = 1000,
@@ -547,6 +546,120 @@ final_xgb %>%
 
 final_res <- last_fit(final_xgb, data_split)
 print(collect_metrics(final_res))
+```
+
+```{r}
+all_data_2 <- all_data |> filter(Poste_globale == "Attaquant")
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.8, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 500,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.025,0.05,0.1,0.2))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+# Plot avec ggplot2
+ggplot(data_test_fin_2, aes(x = .pred, y = Difference)) +
+  geom_point() +
+  labs(title = "Différence entre les valeurs prédites et réelles",
+       x = "Valeurs Prédites",
+       y = "Différence")
+
+
+ggplot(data_test_fin_2, aes(x = Difference)) +
+  geom_histogram(binwidth = 0.01, fill = "blue", color = "black", alpha = 0.7) +
+  labs(title = "Distribution des différences entre les valeurs prédites et réelles",
+       x = "Différence",
+       y = "Fréquence")
+
+ggplot(data_test_fin_2, aes(x = .pred, y = Note)) +
+  geom_point() +
+  labs(title = "Différence entre les valeurs prédites et réelles",
+       x = "Valeurs Prédites",
+       y = "Note")
+
+final_res <- last_fit(final_xgb, data_split)
+final_metrics <- collect_metrics(final_res)
+
+ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = ifelse(Difference >= 0, "green", "red"))) +
+  geom_point() +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1) +
+  labs(title = "Différence entre les valeurs prédites et réelles par individu",
+       x = "Individu",
+       y = "Différence") +
+  scale_color_identity() +
+  theme_minimal()
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Différence entre les valeurs prédites et réelles par individu pour la population attaquant",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+
+
+
 ```
 
 ### b) Random Forest
