@@ -463,90 +463,7 @@ On semble plutot suivre une loin normale sur chacun des notes des différents po
 
 ### a) XGBoost
 
-```{r}
-all_data <- all_data |> filter(Poste_globale == "Attaquant")
-all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
-all_data_xg <- na.omit(all_data_xg, cols = "Note")
-
-
-#Diviser en entrainement et test
-set.seed(123)
-data_split <- initial_split(all_data_xg, prop = 0.8, strata = Note)
-data_train <- training(data_split)
-data_test <- testing(data_split)
-
-#Préparation des données 
-variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
-recipe_xg <- recipe(Note ~ ., data = data_train) |>
-  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
-  step_normalize(all_predictors())
-
-
-xgb_model <- boost_tree(
-  trees = 1000,
-  tree_depth = tune(), min_n = tune(),
-  loss_reduction = tune(),                  
-  sample_size = tune(), mtry = tune(),         
-  learn_rate = tune()                          
-) %>%
-  set_engine("xgboost") %>%
-  set_mode("regression")
-
-xgb_grid <- grid_latin_hypercube(
-  tree_depth(),
-  min_n(),
-  loss_reduction(),
-  sample_size = sample_prop(),
-  finalize(mtry(), data_train),
-  learn_rate(),
-  size = 30
-)
-
-xgb_wf <- workflow() |>
-  add_recipe(recipe_xg) |>
-  add_model(xgb_model)
-
-set.seed(123)
-play_samples_cv <- vfold_cv(data_test,v=5,repeats=1,strata="Note")
-
-doParallel::registerDoParallel()
-
-set.seed(234)
-xgb_res <- tune_grid(
-  xgb_wf,
-  resamples = play_samples_cv,
-  grid = xgb_grid,
-  control = control_grid(save_pred = TRUE)
-)
-
-collect_metrics(xgb_res)
-
-xgb_res %>%
-  collect_metrics() %>%
-  filter(.metric == "rsq") %>%
-  select(mean, mtry:sample_size) %>%
-  pivot_longer(mtry:sample_size,
-               values_to = "value",
-               names_to = "parameter"
-  ) %>%
-  ggplot(aes(value, mean, color = parameter)) +
-  geom_point(alpha = 0.8, show.legend = FALSE) +
-  facet_wrap(~parameter, scales = "free_x") +
-  labs(x = NULL, y = "rsq")
-
-show_best(xgb_res, "rmse")
-best_rsq <- select_best(xgb_res, "rmse")
-
-final_xgb <- finalize_workflow(xgb_wf, best_rsq)
-
-final_xgb %>%
-  fit(data = data_train) %>%
-  pull_workflow_fit() %>%
-  vip(geom = "point")
-
-final_res <- last_fit(final_xgb, data_split)
-print(collect_metrics(final_res))
-```
+### Attaquant
 
 ```{r}
 all_data_2 <- all_data |> filter(Poste_globale == "Attaquant")
@@ -555,7 +472,7 @@ all_data_xg <- na.omit(all_data_xg, cols = "Note")
 
 #Diviser en entrainement et test
 set.seed(123)
-data_split <- initial_split(all_data_xg, prop = 0.8, strata = Note)
+data_split <- initial_split(all_data_xg, prop = 0.75, strata = Note)
 data_train <- training(data_split)
 data_test <- testing(data_split)
 
@@ -582,7 +499,7 @@ xgb_wf <- workflow() |>
 
 play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
 
-xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.025,0.05,0.1,0.2))
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.01,0.015,0.02,0.025))
 
 xgb_3fold <- xgb_wf |>
   tune_grid(resamples=play_samples_cv,grid=xgb_grid,
@@ -608,37 +525,342 @@ data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
 data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
 
 
-# Plot avec ggplot2
-ggplot(data_test_fin_2, aes(x = .pred, y = Difference)) +
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot_att <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
   geom_point() +
-  labs(title = "Différence entre les valeurs prédites et réelles",
-       x = "Valeurs Prédites",
-       y = "Différence")
-
-
-ggplot(data_test_fin_2, aes(x = Difference)) +
-  geom_histogram(binwidth = 0.01, fill = "blue", color = "black", alpha = 0.7) +
-  labs(title = "Distribution des différences entre les valeurs prédites et réelles",
-       x = "Différence",
-       y = "Fréquence")
-
-ggplot(data_test_fin_2, aes(x = .pred, y = Note)) +
-  geom_point() +
-  labs(title = "Différence entre les valeurs prédites et réelles",
-       x = "Valeurs Prédites",
-       y = "Note")
-
-final_res <- last_fit(final_xgb, data_split)
-final_metrics <- collect_metrics(final_res)
-
-ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = ifelse(Difference >= 0, "green", "red"))) +
-  geom_point() +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 1) +
-  labs(title = "Différence entre les valeurs prédites et réelles par individu",
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur Attaquant",
        x = "Individu",
        y = "Différence") +
-  scale_color_identity() +
-  theme_minimal()
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot_att
+
+
+```
+
+### Milieu
+
+```{r}
+all_data_2 <- all_data |> filter(Poste_globale == "Milieu")
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.75, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 500,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.01,0.015,0.02,0.025))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot_mil <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur Milieu",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot_mil
+
+```
+
+### Défenseur
+
+```{r}
+all_data_2 <- all_data |> filter(Poste_globale == "Défenseur")
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.75, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 500,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.0225,0.025,0.0275,0.03,0.0325,0.0350))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot_def <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur Défenseur",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot_def
+
+```
+
+### Gardien
+
+```{r}
+all_data_2 <- all_data |> filter(Poste_globale == "Gardien")
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.75, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 500,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.0225,0.025,0.0275,0.03,0.0325,0.0350))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot_gardien <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur Gardien",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot_gardien
+
+```
+
+### Total
+
+```{r}
+all_data_2 <- all_data 
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_globale))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.75, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","minJ","Apparences","But","PasseDecisive","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 1000,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(2,3,4,5,6,7),learn_rate=c(0.0200,0.0205,0.0210,0.215,0.2200,.02255))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
 
 # Calculer la médiane et les intervalles de confiance
 median_diff <- median(data_test_fin_2$Difference)
@@ -651,15 +873,13 @@ gg_plot <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Differ
   geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
   geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
   geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
-  labs(title = "Différence entre les valeurs prédites et réelles par individu pour la population attaquant",
+  labs(title = "Prédiction XGboost sur population",
        x = "Individu",
        y = "Différence") +
   scale_colour_gradientn(colours = terrain.colors(10)) +
   theme_classic() 
 
-
-
-
+gg_plot
 ```
 
 ### b) Random Forest
