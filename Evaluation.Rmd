@@ -1001,10 +1001,6 @@ ggplot(comparison_rf, aes(x = rownames(comparison_rf), y = Residuals, color = Ac
   scale_colour_gradientn(colours = terrain.colors(10)) +
   theme_classic() 
 
-# Affichage des métriques
-print(paste("RMSE :", RMSE))
-print(paste("R-squared :", R2))
-print(paste("Erreur absolue moyenne :", mean_absolute_diff))
 ```
 
 ### c) Régression linéaire
@@ -1014,99 +1010,66 @@ print(paste("Erreur absolue moyenne :", mean_absolute_diff))
 ```{r}
 #Division en jeu d'entraienement 
 
+# Division en jeu d'entraînement
 set.seed(123)
 data_split <- initial_split(all_data, prop = 0.8, strata = Note)
 data_train <- training(data_split)
 data_test <- testing(data_split)
 
-#### Mise en place des modèles sans sélection de poste ####
-lm_rec <- recipe(Note ~ ., data = data_train)
-
-lm_model <- linear_reg() |>
-  set_engine("lm") |>
-  set_mode("regression")
-
-lm_wf <- workflow() |>
-  add_model(lm_model) |>
-  add_recipe(lm_rec)
-
-lm_fit <- lm_wf |>
-  fit(data=data_train)
-
-
-lm_fit |>
-  tidy()
-
-lm_fit |>
-  glance()
-
-# autres méthodes avec lm, on obtient des résultats similaires
-reg <- lm(Note ~ .,data=data_train)
-summary(reg)
-
-
+# Préparation des données
 data_train <- subset(data_train, select = -c(nom, Poste, Club, Annee, Poste_global))
 data_train <- na.omit(data_train, cols = "Note")
 
 data_test <- subset(data_test, select = -c(nom, Poste, Club, Annee, Poste_global))
 data_test <- na.omit(data_test, cols = "Note")
 
+# Entraînement du modèle de régression linéaire
+lm_fit <- lm(Note ~ ., data = data_train)
 
-reg <- lm(Note ~ .,data=data_train)
-summary(reg)
-
-
-predictions_lin <- predict(reg, new_data = data_test)
+# Prédictions sur l'ensemble de test
+predictions_lin <- predict(lm_fit, newdata = data_test)
 actual_values <- data_test$Note  
 
-comparison_lin <- data.frame(Actual = actual_values, Predicted = predictions_lin)
-residuals_lin <- actual_values - predictions_lin
-
+# Création du dataframe de comparaison
 comparison_lin <- data.frame(
   Actual = actual_values,
   Predicted = predictions_lin,
-  Residuals = residuals_lin
+  Residuals = actual_values - predictions_lin
 )
 
-colnames(comparison_lin) <- c("Actual", "Predicted", "Residuals")
+# Calcul des statistiques d'évaluation
+median_diff <- median(comparison_lin$Actual - comparison_lin$Predicted)
+ci_low <- quantile(comparison_lin$Actual - comparison_lin$Predicted, 0.025)
+ci_high <- quantile(comparison_lin$Actual - comparison_lin$Predicted, 0.975)
 
-comparison_lin$Difference <- comparison_lin$Actual - comparison_lin$Predicted
-comparison_lin$DifferenceAbs <- abs(comparison_lin$Actual - comparison_lin$Predicted)
-
-
-
-
-# Calculer la médiane et les intervalles de confiance
-median_diff <- median(comparison_lin$Difference)
-ci_low <- quantile(comparison_lin$Difference, 0.025)
-ci_high <- quantile(comparison_lin$Difference, 0.975)
-
-# Créer le plot ggplot2 avec médiane et intervalles de confiance
+# Création du plot ggplot2
 ggplot(comparison_lin, aes(x = rownames(comparison_lin), y = Residuals, color = Actual)) +
   geom_point() +
   geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
   geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
   geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
-  labs(title = "Prédiction Regréssion linéaire sur population",
+  labs(title = "Prédiction Régression Linéaire sur la population",
        x = "Individu",
        y = "Différence") +
   scale_colour_gradientn(colours = terrain.colors(10)) +
   theme_classic() 
 
+# Calcul des métriques d'évaluation
 RMSE_reg_tot <- sqrt(mean(comparison_lin$Residuals^2))
 R2_reg_tot <- 1 - sum((comparison_lin$Actual - comparison_lin$Predicted)^2) / sum((comparison_lin$Actual - mean(comparison_lin$Predicted))^2)
-erreur_moy_abs_tot_reg <- mean(comparison_lin$DifferenceAbs)
+erreur_moy_abs_tot_reg <- mean(abs(comparison_lin$Actual - comparison_lin$Predicted))
 ```
 
 #### Attaquant
 
 ```{r}
-#### Mise en place des modèles en sélectionnant le poste, exemple de l'attaquant ####
+# Division en jeu d'entraînement
 set.seed(123)
 data_split <- initial_split(all_data, prop = 0.8, strata = Note)
 data_train <- training(data_split)
 data_test <- testing(data_split)
 
+# Filtrage pour les attaquants
 all_data_poste_train <- data_train |> filter(Poste_global == "Attaquant")
 all_data_poste_train <- subset(all_data_poste_train, select = -c(nom, Poste, Club, Annee, Poste_global))
 all_data_poste_train <- na.omit(all_data_poste_train, cols = "Note")
@@ -1115,51 +1078,41 @@ all_data_poste_test <- data_test |> filter(Poste_global == "Attaquant")
 all_data_poste_test <- subset(all_data_poste_test, select = -c(nom, Poste, Club, Annee, Poste_global))
 all_data_poste_test <- na.omit(all_data_poste_test, cols = "Note")
 
+# Entraînement du modèle de régression linéaire
+lm_fit_att <- lm(Note ~ ., data = all_data_poste_train)
 
-reg <- lm(Note ~ .,data=all_data_poste_train)
-summary(reg)
+# Prédictions sur l'ensemble de test
+predictions_poste_lin_att <- predict(lm_fit_att, newdata = all_data_poste_test)
+actual_values <- all_data_poste_test$Note  
 
-
-predictions_poste_lin_att <- predict(lm_fit, new_data = all_data_poste_test)
-actual_values <- all_data_poste_test$Note  # Remplacez "Note" par le nom de votre variable dépendante
-comparison_poste_lin_att <- data.frame(Actual = actual_values, Predicted = predictions_poste_lin_att)
-residuals_lin_att <- actual_values - predictions_poste_lin_att
-
+# Création du dataframe de comparaison
 comparison_poste_lin_att <- data.frame(
   Actual = actual_values,
   Predicted = predictions_poste_lin_att,
-  Residuals = residuals_lin_att
+  Residuals = actual_values - predictions_poste_lin_att
 )
 
-colnames(comparison_poste_lin_att) <- c("Actual", "Predicted", "Residuals")
+# Calcul des statistiques d'évaluation
+median_diff <- median(comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted)
+ci_low <- quantile(comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted, 0.025)
+ci_high <- quantile(comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted, 0.975)
 
-comparison_poste_lin_att$Difference <- comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted
-comparison_poste_lin_att$DifferenceAbs <- abs(comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted)
-
-
-
-
-# Calculer la médiane et les intervalles de confiance
-median_diff <- median(comparison_poste_lin_att$Difference)
-ci_low <- quantile(comparison_poste_lin_att$Difference, 0.025)
-ci_high <- quantile(comparison_poste_lin_att$Difference, 0.975)
-
-# Créer le plot ggplot2 avec médiane et intervalles de confiance
+# Création du plot ggplot2
 ggplot(comparison_poste_lin_att, aes(x = rownames(comparison_poste_lin_att), y = Residuals, color = Actual)) +
   geom_point() +
   geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
   geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
   geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
-  labs(title = "Prédiction Regréssion linéaire sur population",
+  labs(title = "Prédiction Régression Linéaire sur la population des attaquants",
        x = "Individu",
        y = "Différence") +
   scale_colour_gradientn(colours = terrain.colors(10)) +
   theme_classic() 
 
+# Calcul des métriques d'évaluation
 RMSE_reg_att <- sqrt(mean(comparison_poste_lin_att$Residuals^2))
 R2_reg_att <- 1 - sum((comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted)^2) / sum((comparison_poste_lin_att$Actual - mean(comparison_poste_lin_att$Predicted))^2)
-erreur_moy_abs_att_reg <- mean(comparison_poste_lin_att$DifferenceAbs)
-
+erreur_moy_abs_att_reg <- mean(abs(comparison_poste_lin_att$Actual - comparison_poste_lin_att$Predicted))
 ```
 
 ### d) Régression Lasso
@@ -1167,35 +1120,47 @@ erreur_moy_abs_att_reg <- mean(comparison_poste_lin_att$DifferenceAbs)
 #### Total
 
 ```{r}
-# Régression LASSO avec validation croisée
+# Définition du modèle LASSO
+# Division en jeu d'entraînement
+set.seed(123)
+data_split <- initial_split(all_data, prop = 0.8, strata = Note)
+data_train_2 <- training(data_split)
+data_test_2 <- testing(data_split)
+
+# Préparation des données
+data_train_3 <- subset(data_train_2, select = -c(nom, Poste, Club, Annee, Poste_global))
+data_train <- na.omit(data_train_3, cols = "Note")
+
+data_test_3 <- subset(data_test_2, select = -c(nom, Poste, Club, Annee, Poste_global))
+data_test <- na.omit(data_test_3, cols = "Note")
 
 lasso_model <- linear_reg() |>
   set_engine("glmnet") |>
   set_mode("regression") |>
   set_args(penalty = tune(), mixture = 1)
 
+# Création du workflow pour le LASSO
 lasso_wf <- workflow() |> 
   add_model(lasso_model) |> 
   add_formula(Note ~ .)
 
-folds <- vfold_cv(data_train, v=5, strata = "Note")
+# Création des folds pour la validation croisée
+folds <- vfold_cv(data_train, v = 3, strata = "Note")
 
+# Définition de la grille de recherche du paramètre lambda
 lambda_grid <- grid_regular(penalty(range = c(-5, 2)), levels = 100)
-lambda_grid$penalty
 
+# Validation croisée pour le LASSO
 lasso_cv <- lasso_wf |> 
   tune_grid(resamples = folds, grid = lambda_grid, metrics = metric_set(rsq))
 
-
-res <- lasso_cv |>
-  collect_metrics()
-
-
-res$mean
+# Collecte des métriques
+res <- lasso_cv |> collect_metrics()
 
 
-lasso_cv |>
-  collect_metrics() |>
+
+lasso_cv |> 
+  collect_metrics() |> 
   ggplot(aes(penalty, mean, color = .metric)) +
   geom_errorbar(aes(
     ymin = mean - std_err,
@@ -1208,58 +1173,54 @@ lasso_cv |>
   scale_x_log10() +
   theme(legend.position = "none")
 
-# On sélectionne le lambda qui minimise le risque estimé par VC
-
-best_rsq <- lasso_cv |>
-  select_best(metric="rsq")
+# Sélection du meilleur lambda
+best_rsq <- lasso_cv |> select_best(metric = "rsq")
 best_rsq$penalty
 
-# On relance (entraine) la régression LASSO avec ce "meilleur" lambda sur l'ensemble du jeu de données pour obtenir le "meilleur" prédicteur LASSO
-
-final_wf <- finalize_workflow(lasso_wf,best_rsq)
+# Finalisation du workflow avec le meilleur lambda
+final_wf <- finalize_workflow(lasso_wf, best_rsq)
 print(final_wf)
 
-final_lasso <- final_wf |>
-  fit(data_train)
+# Entraînement du modèle LASSO avec le meilleur lambda sur l'ensemble des données d'entraînement
+final_lasso <- final_wf |> fit(data_train)
 
+# Tidy sur le modèle LASSO
 final_lasso |> tidy()
 
-
+# Prédictions avec le modèle LASSO sur l'ensemble de test
 predictions_lasso <- predict(final_lasso, new_data = data_test)
-comparison_lasso <- data.frame(Actual = actual_values, Predicted = predictions_lasso)
+comparison_lasso <- data.frame(Actual = data_test$Note, Predicted = predictions_lasso)
 residuals_lasso <- actual_values - predictions_lasso
 
 comparison_lasso <- data.frame(
-  Actual = actual_values,
+  Actual = data_test$Note,
   Predicted = predictions_lasso,
   Residuals = residuals_lasso
 )
 colnames(comparison_lasso) <- c("Actual", "Predicted", "Residuals")
 
-
+# Calcul des différences et des erreurs absolues
 comparison_lasso$Difference <- comparison_lasso$Actual - comparison_lasso$Predicted
 comparison_lasso$DifferenceAbs <- abs(comparison_lasso$Actual - comparison_lasso$Predicted)
 
-
-
-
-# Calculer la médiane et les intervalles de confiance
+# Calcul de la médiane et des intervalles de confiance
 median_diff <- median(comparison_lasso$Difference)
 ci_low <- quantile(comparison_lasso$Difference, 0.025)
 ci_high <- quantile(comparison_lasso$Difference, 0.975)
 
-# Créer le plot ggplot2 avec médiane et intervalles de confiance
+# Création du plot ggplot2
 ggplot(comparison_lasso, aes(x = rownames(comparison_lasso), y = Residuals, color = Actual)) +
   geom_point() +
   geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
   geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
   geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
-  labs(title = "Prédiction Regréssion LASSO sur population",
+  labs(title = "Prédiction Régression LASSO sur la population",
        x = "Individu",
        y = "Différence") +
   scale_colour_gradientn(colours = terrain.colors(10)) +
   theme_classic() 
 
+# Calcul des métriques d'évaluation
 RMSE_regLASSO_tot <- sqrt(mean(comparison_lasso$Residuals^2))
 R2_regLASSO_tot <- 1 - sum((comparison_lasso$Actual - comparison_lasso$Predicted)^2) / sum((comparison_lasso$Actual - mean(comparison_lasso$Predicted))^2)
 erreur_moy_abs_tot_regLASSO <- mean(comparison_lasso$DifferenceAbs)
@@ -1269,6 +1230,21 @@ erreur_moy_abs_tot_regLASSO <- mean(comparison_lasso$DifferenceAbs)
 #### Attaquant
 
 ```{r}
+set.seed(123)
+data_split <- initial_split(all_data, prop = 0.8, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+# Filtrage pour les attaquants
+all_data_poste_train <- data_train |> filter(Poste_global == "Attaquant")
+all_data_poste_train <- subset(all_data_poste_train, select = -c(nom, Poste, Club, Annee, Poste_global))
+all_data_poste_train <- na.omit(all_data_poste_train, cols = "Note")
+
+all_data_poste_test <- data_test |> filter(Poste_global == "Attaquant")
+all_data_poste_test <- subset(all_data_poste_test, select = -c(nom, Poste, Club, Annee, Poste_global))
+all_data_poste_test <- na.omit(all_data_poste_test, cols = "Note")
+
+
 lasso_att_model <- linear_reg() |>
   set_engine("glmnet") |>
   set_mode("regression") |>
@@ -1326,7 +1302,7 @@ final_lasso_att |> tidy()
 
 
 predictions_poste_lasso_att <- predict(final_lasso_att, new_data = all_data_poste_test)
-comparison_poste_lasso_att <- data.frame(Actual = actual_values, Predicted = predictions_poste_lasso_att)
+comparison_poste_lasso_att <- data.frame(Actual = all_data_poste_test$Note, Predicted = predictions_poste_lasso_att)
 residuals_lasso_att <- actual_values - predictions_poste_lasso_att
 
 comparison_poste_lasso_att <- data.frame(
@@ -1371,6 +1347,17 @@ erreur_moy_abs_att_regLASSO <- mean(comparison_poste_lasso_att$DifferenceAbs)
 
 ```{r}
 # Régression RIDGE avec validation croisée
+set.seed(123)
+data_split <- initial_split(all_data, prop = 0.8, strata = Note)
+data_train_2 <- training(data_split)
+data_test_2 <- testing(data_split)
+
+# Préparation des données
+data_train_3 <- subset(data_train_2, select = -c(nom, Poste, Club, Annee, Poste_global))
+data_train <- na.omit(data_train_3, cols = "Note")
+
+data_test_3 <- subset(data_test_2, select = -c(nom, Poste, Club, Annee, Poste_global))
+data_test <- na.omit(data_test_3, cols = "Note")
 
 ridge_model <- linear_reg() |>
   set_engine("glmnet") |>
@@ -1425,11 +1412,10 @@ final_ridge |> tidy()
 
 
 predictions_ridge <- predict(final_ridge, new_data = data_test)
-comparison_ridge <- data.frame(Actual = actual_values, Predicted = predictions_ridge)
 residuals_ridge <- actual_values - predictions_ridge
 
 comparison_ridge <- data.frame(
-  Actual = actual_values,
+  Actual = data_test$Note,
   Predicted = predictions_ridge,
   Residuals = residuals_ridge
 )
@@ -1466,6 +1452,21 @@ erreur_moy_abs_tot_regRIDGE <- mean(comparison_ridge$DifferenceAbs)
 #### Attaquant
 
 ```{r}
+
+set.seed(123)
+data_split <- initial_split(all_data, prop = 0.8, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+# Filtrage pour les attaquants
+all_data_poste_train <- data_train |> filter(Poste_global == "Attaquant")
+all_data_poste_train <- subset(all_data_poste_train, select = -c(nom, Poste, Club, Annee, Poste_global))
+all_data_poste_train <- na.omit(all_data_poste_train, cols = "Note")
+
+all_data_poste_test <- data_test |> filter(Poste_global == "Attaquant")
+all_data_poste_test <- subset(all_data_poste_test, select = -c(nom, Poste, Club, Annee, Poste_global))
+all_data_poste_test <- na.omit(all_data_poste_test, cols = "Note")
+
 ridge_att_model <- linear_reg() |>
   set_engine("glmnet") |>
   set_mode("regression") |>
@@ -1571,7 +1572,64 @@ recap <- recap %>%
   mutate_at(vars(RMSE, R2, DifMoyAbs), ~ round(., 4))
 
 print(recap)
+
+
+## Afin d'éviter de relancer tout les modèles nous placons ici un récap des différent smodèles
+recap <- data.frame(
+  Model = c("XG_att", "XG_mil", "XG_def", "XG_gar", "XG_tot", 
+            "Reg_tot", "Reg_att", "Reg_LASSO_tot", "Reg_LASSO_att", 
+            "Reg_RIDGE_tot", "Reg_RIDGE_att", "Rf_tot"),
+  R2 = c(0.4680, 0.4536, 0.3587, 0.0549, 0.3894, 0.3304, 
+         0.5126, 0.3304, 0.5130, 0.3256, 0.5118, 0.3882),
+  RMSE = c(0.2650, 0.2600, 0.2543, 0.3741, 0.2837, 0.2922, 
+           0.2311, 0.3788, 0.2310, 0.3734, 0.2312, 0.2793),
+  DifMoyAbs = c(0.1386, 0.1431, 0.1449, 0.2524, 0.1517, 0.1643, 
+                0.1285, 0.1284, 0.1641, 0.1622, 0.1283, 0.1541)
+)
+
+library(ggplot2)
+library(patchwork)
+
+# Filtrer les modèles contenant "tot" dans leur nom
+recap_tot <- recap[grep("tot", recap$Model), ]
+
+# Créer trois graphiques linéaires pour chaque variable
+# R2
+plot_r2 <- ggplot(recap_tot, aes(x = Model, y = R2, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "R2") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# RMSE
+plot_rmse <- ggplot(recap_tot, aes(x = Model, y = RMSE, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "RMSE") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# DifMoyAbs
+plot_dif <- ggplot(recap_tot, aes(x = Model, y = DifMoyAbs, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "DifMoyAbs") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combinaison des trois graphiques
+combined_plot <- plot_r2 + plot_rmse + plot_dif
+
+# Affichage de la combinaison
+combined_plot
+
 ```
+
+On peut donc ici voir que XGboost produit les meilleurs résultats sur la population globale
 
 ## Conclusion de sélection de modèle
 
@@ -1579,7 +1637,7 @@ Pour conclure sur la sélection de modèle, dans notre cas va s'opérer sur la p
 
 Toutefois nous avons identifier quelques axes x'améliorations que l'on pourrait inclure à notre modèle pour le rendre légérement plus restrictif mais plus puissant :
 
--   Transformer les variables pour qu'elles représentente toutes la même unités de mesures ( Dans notre jeu de données la quasi-totalités des variables sont exprimés par % sur un match ou par moyenne par matchs à l'exception de trois ( Min Joués, But et passes décisives nous allons donc essyayer de transformer cela afin d'étudier les gains de précisions de ce dernier.
+-   Transformer les variables pour qu'elles représentente toutes la même unités de mesures ( Dans notre jeu de données la quasi-totalités des variables sont exprimés par % sur un match ou par moyenne par matchs à l'exception de trois ( Min Joués, But et passes décisives nous allons donc essyayer de transformer cela afin d'étudier les gains de précisions de ce dernier).
 
 ```{r}
 test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
@@ -1587,13 +1645,317 @@ test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
                                 PasseDe_match = (PasseDecisive/minJ)*90)
 
 
+all_data_xg <- subset(test_data, select = -c(nom, Poste, Club, Annee, Poste_global, minJ, But, PasseDecisive))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.65, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_numeric_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 1000,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(1,2,3,4,5),learn_rate=c(0.0205,0.0210, 0.215,0.220))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur population",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot
+R2_tot_xg_trans1 <- 1 - sum((data_test_fin_2$Note - data_test_fin_2$.pred)^2) / sum((data_test_fin_2$Note - mean(data_test_fin_2$Note))^2)
+RMSE_tot_xg_trans1 <- sqrt(mean((data_test_fin_2$Note - data_test_fin_2$.pred)^2))
+erreur_moy_abs_tot_xg_trans1 <- mean(data_test_fin_2$DifferenceAbs)
+
+
+```
+
+-   Si on se fixe également sur un point de vue sportif. Evaluer des joueurs qui joue très peu dans un match ou sur l'ensemble de la saison ne nous semble pas cohérent (nous décidons donc de laisser uniquement les joueurs jouant plus de 270 min sur la saison et plus de 45 min par apparitions
+
+```{r}
+test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
+                                But_match = (But/minJ)*90,
+                                PasseDe_match = (PasseDecisive/minJ)*90)
+all_data_2 <- test_data |> filter(minJ >270)
+all_data_2 <- all_data_2 |> filter(MJ_match > 45)
+
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_global, minJ, But, PasseDecisive))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.65, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_numeric_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 1000,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(1,2,3,4,5),learn_rate=c(0.0205,0.0210, 0.215,0.220))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur population",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot
+R2_tot_xg_trans2 <- 1 - sum((data_test_fin_2$Note - data_test_fin_2$.pred)^2) / sum((data_test_fin_2$Note - mean(data_test_fin_2$Note))^2)
+RMSE_tot_xg_trans2 <- sqrt(mean((data_test_fin_2$Note - data_test_fin_2$.pred)^2))
+erreur_moy_abs_tot_xg_trans2 <- mean(data_test_fin_2$DifferenceAbs)
+```
+
+-   Enfin, on voit que la grande majorité des joueurs ont des notes compris entre 6 et 8 et on voit sur les graphes associés à chaque modèles que l'on a beaucoup de mal à prédire la performance de joueurs ayant des notes un peu atypiques. On décide donc de conserver uniquement les joeueurs avec une notes comprises entre 6 et 8
+
+```{r}
+test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
+                                But_match = (But/minJ)*90,
+                                PasseDe_match = (PasseDecisive/minJ)*90)
+all_data_2 <- test_data |> filter(minJ >270)
+all_data_2 <- all_data_2 |> filter(MJ_match > 45)
+all_data_3 <- all_data_2 |> filter(Note >= 6)
+all_data_4 <- all_data_3 |> filter(Note <= 8)
+
+
+all_data_xg <- subset(all_data_2, select = -c(nom, Poste, Club, Annee, Poste_global, minJ, But, PasseDecisive))
+all_data_xg <- na.omit(all_data_xg, cols = "Note")
+
+#Diviser en entrainement et test
+set.seed(123)
+data_split <- initial_split(all_data_xg, prop = 0.65, strata = Note)
+data_train <- training(data_split)
+data_test <- testing(data_split)
+
+#Préparation des données 
+variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+
+recipe_xg <- recipe(Note ~ ., data = data_train) |>
+  update_role(all_of(variable_a_tester_xg), new_role = "predictor") |>
+  step_normalize(all_numeric_predictors())
+
+xgb_model <-
+  boost_tree(
+    trees = 1000,
+    stop_iter=20,
+    min_n = 1,
+    tree_depth = tune(),
+    learn_rate = tune()
+  ) |>
+  set_mode("regression") |>
+  set_engine("xgboost")
+
+xgb_wf <- workflow() |>
+  add_recipe(recipe_xg) |>
+  add_model(xgb_model)
+
+play_samples_cv <- vfold_cv(data_train,v=3,repeats=1,strata="Note")
+
+xgb_grid <- expand.grid(tree_depth=c(1,2,3,4,5),learn_rate=c(0.0205,0.0210, 0.215,0.220))
+
+xgb_3fold <- xgb_wf |>
+  tune_grid(resamples=play_samples_cv,grid=xgb_grid,
+            metrics=metric_set(mae))
+
+xgb_3fold |> autoplot()
+
+best_par <- xgb_3fold |>
+  select_best()
+
+final_xgb <- xgb_wf |> 
+  finalize_workflow(best_par) |>
+  fit(data = data_train)
+
+pred <- final_xgb |>
+  predict(new_data=data_test)
+
+
+data_test_fin <- data_test |> select(Note)
+data_test_fin_2 <- cbind(pred, data_test_fin)
+
+data_test_fin_2$Difference <- data_test_fin_2$Note - data_test_fin_2$.pred
+data_test_fin_2$DifferenceAbs <- abs(data_test_fin_2$Note - data_test_fin_2$.pred)
+
+
+
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(data_test_fin_2$Difference)
+ci_low <- quantile(data_test_fin_2$Difference, 0.025)
+ci_high <- quantile(data_test_fin_2$Difference, 0.975)
+
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+gg_plot <- ggplot(data_test_fin_2, aes(x = rownames(data_test_fin_2), y = Difference, color = Note)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5)+ 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5)+ 
+  labs(title = "Prédiction XGboost sur population",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
+
+gg_plot
+R2_tot_xg_trans3 <- 1 - sum((data_test_fin_2$Note - data_test_fin_2$.pred)^2) / sum((data_test_fin_2$Note - mean(data_test_fin_2$Note))^2)
+RMSE_tot_xg_trans3 <- sqrt(mean((data_test_fin_2$Note - data_test_fin_2$.pred)^2))
+erreur_moy_abs_tot_xg_trans3 <- mean(data_test_fin_2$DifferenceAbs)
 ```
 
 ```{r}
-all_data_2 <- test_data |> filter(minJ >270)
-all_data_2 <- all_data_2 |> filter(MJ_match > 45)
-all_data_2 <- all_data_2 |> filter(Note >=6)
-all_data_2 <- all_data_2 |> filter(Note <=8)
+#Amélioration de modèle 
+df_recap_xg <- data.frame(
+  Model = c("Xg_tot", "Xg_tot_par_match", "Xg_tot_par_match_tpsJeu", "Xg_tot_par_match_tpsJeu_Note6_8"),
+  R2 = c(R2_tot_xg, R2_tot_xg_trans1, R2_tot_xg_trans2, R2_tot_xg_trans3),
+  RMSE = c(RMSE_tot_xg, RMSE_tot_xg_trans1, RMSE_tot_xg_trans2, RMSE_tot_xg_trans3),
+  DiffAbsMoy = c(erreur_moy_abs_tot_xg, erreur_moy_abs_tot_xg_trans1, erreur_moy_abs_tot_xg_trans2, erreur_moy_abs_tot_xg_trans3)
+)
 
-variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+plot_r2 <- ggplot(df_recap_xg, aes(x = Model, y = R2, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "R2") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# RMSE
+plot_rmse <- ggplot(df_recap_xg, aes(x = Model, y = RMSE, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "RMSE") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# DifMoyAbs
+plot_dif <- ggplot(df_recap_xg, aes(x = Model, y = DiffAbsMoy, group = 1)) +
+  geom_line() +
+  labs(
+       x = "Modèle",
+       y = "DifMoyAbs") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combinaison des trois graphiques
+combined_plot <- plot_r2 + plot_rmse + plot_dif
+
+# Affichage de la combinaison
+combined_plot
+
 ```
