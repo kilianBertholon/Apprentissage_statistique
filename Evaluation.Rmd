@@ -904,109 +904,107 @@ Nous avons tester pour chaque post et pour la population totale XGboost on va ve
 
 -   La différence absolu moyenne = Moyenne ( \| Note - note.pred\| )
 
-```{r}
-test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
-                                But_match = (But/minJ)*90,
-                                PasseDe_match = (PasseDecisive/minJ)*90)
-
-all_data_2 <- test_data |> filter(minJ >270)
-all_data_2 <- all_data_2 |> filter(MJ_match > 45)
-all_data_2 <- all_data_2 |> filter(Note >=6)
-all_data_2 <- all_data_2 |> filter(Note <=8)
-
-variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
-
-```
-
 ### b) Random Forest
 
-```{r}
-#### Diviser en entrainement et test
+#### Total
 
+```{r}
+library(ranger)
+library(caret)
+library(tidymodels)
+library(ggplot2)
+
+# Définir la graine pour la reproductibilité
 set.seed(123)
+
+# Séparation des données en ensemble d'entraînement et ensemble de test
 data_split <- initial_split(all_data, prop = 0.8, strata = Note)
 data_train <- training(data_split)
 data_test <- testing(data_split)
 
-
-#### Mise en place des modèles sans sélection de poste ####
-
-
+# Supprimer les colonnes non pertinentes
 data_train <- subset(data_train, select = -c(nom, Poste, Club, Annee, Poste_global))
 data_train <- na.omit(data_train, cols = "Note")
 
 data_test <- subset(data_test, select = -c(nom, Poste, Club, Annee, Poste_global))
 data_test <- na.omit(data_test, cols = "Note")
 
+# Recherche du meilleur mtry par validation croisée
+pargrid_regression <- expand.grid(mtry = 1:16,
+                                  splitrule = "variance",
+                                  min.node.size = 1)
 
-show_engines("rand_forest")
-#?randomForest::randomForest
-?ranger::ranger
+# Définir le schéma de validation croisée
+ctrl <- trainControl(method = "cv", number = 5)
 
-# rf <- randomForest::randomForest(Note~.,data=data_train)
-# rf
+# Entraîner le modèle avec validation croisée
+rf_model <- train(Note ~ ., 
+                  data = data_train, 
+                  method = "ranger", 
+                  trControl = ctrl, 
+                  tuneGrid = pargrid_regression)
 
-rf <- ranger::ranger(Note~.,data=data_train)
-rf
-rf$prediction.error
+# Afficher les résultats de la validation croisée
+print(rf_model)
 
-OOB <- numeric(16)
-for (i in 1:16) {
-  rf <- ranger::ranger(Note~.,data=data_train,mtry=i)
-  OOB[i]<-rf$prediction.error
-}
-OOB
+# Tracer la performance en fonction de mtry
+ggplot(rf_model$results) +
+  geom_line(aes(x = mtry, y = RMSE, color = "RMSE"), linetype = "solid") +
+  geom_line(aes(x = mtry, y = Rsquared, color = "Rsquared"), linetype = "dashed") +
+  labs(title = "Performance du Random Forest en fonction de mtry",
+       x = "mtry",
+       y = "Métrique") +
+  scale_color_manual(values = c("blue", "red"),
+                     labels = c("RMSE", "Rsquared"))
 
-#graphe de l'erreur Out of Bag
-plot(1:16,OOB,type="l")
+# Sélectionner le modèle optimal
+best_mtry <- rf_model$bestTune$mtry
 
-#Mtry optimisé
-mtry_opt <- which.min(OOB)
-mtry_opt
+# Entraîner le modèle final avec le meilleur mtry
+final_rf_model <- ranger(Note ~ ., 
+                         data = data_train, 
+                         mtry = best_mtry)
 
-#Estimation du risque de la forêt avec le paramètre mtry ajusté/optimisé sur l’échantillon test
-rf_opt <- ranger::ranger(Note~.,data=data_train,mtry=mtry_opt)
-pred <- predict(rf_opt,data=data_test)
-attributes(pred)
-
-pred$predictions
-
-risque.est <- mean(data_test$Note!=pred$predictions)
-print(risque.est)
-
-# Définir la grille de recherche d'hyperparamètres pour la régression
-pargrid_regression <- data.frame(mtry = 1:16, splitrule = rep("variance", 16), min.node.size = rep(1, 16))
-
-# Entraîner le modèle avec la règle de division "variance"
-rfopt <- caret::train(Note ~ ., data = data_train, method = "ranger", tuneGrid = pargrid_regression, trControl = caret::trainControl(method = "oob"))
-
-# Afficher les résultats
-print(rfopt)
+# Prédiction sur l'ensemble de test
+predictions <- predict(final_rf_model, data = data_test)$predictions
 
 
-plot(rfopt$results$mtry,rfopt$results$Accuracy,type="l")
+# Calculer d'autres métriques d'évaluation
+RMSE_tot_rf <- sqrt(mean((data_test$Note - predictions)^2))
+R2_tot_rf <- 1 - sum((data_test$Note - predictions)^2) / sum((data_test$Note - mean(data_test$Note))^2)
+erreur_moy_abs_tot_rf <- mean(abs(data_test$Note - predictions))
+
+# Créer le dataframe de comparaison
+comparison_rf <- data.frame(
+  Actual = data_test$Note,
+  Predicted = predictions,
+  Residuals = data_test$Note - predictions,
+  DifferenceAbs = abs(data_test$Note - predictions)
+  
+)
 
 
-pred <- predict(rfopt$finalModel,data=data_test)
 
+# Calculer la médiane et les intervalles de confiance
+median_diff <- median(comparison_rf$Residuals)
+ci_low <- quantile(comparison_rf$Residuals, 0.025)
+ci_high <- quantile(comparison_rf$Residuals, 0.975)
 
-rf_rec <- recipe(Note ~ ., data = data_train)
-folds <- vfold_cv(data_train, v = 3, repeats = 1, strata = Note)
+# Créer le plot ggplot2 avec médiane et intervalles de confiance
+ggplot(comparison_rf, aes(x = rownames(comparison_rf), y = Residuals, color = Actual)) +
+  geom_point() +
+  geom_hline(yintercept = median_diff, linetype = "dashed", color = "black", size = 1) +
+  geom_hline(yintercept = ci_low, linetype = "dashed", color = "black", size = 0.5) + 
+  geom_hline(yintercept = ci_high, linetype = "dashed", color = "black", size = 0.5) +   labs(title = "Prédiction Random Forest sur population",
+       x = "Individu",
+       y = "Différence") +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_classic() 
 
-rf_model <- rand_forest(mtry=tune()) |>
-  set_mode("regression") |>
-  set_engine("ranger",oob.error=TRUE)
-
-rf_wf <- workflow() |>
-  add_model(rf_model) |>
-  add_recipe(rf_rec)
-
-par_grid <- tibble(mtry=1:16)
-
-rf_cv <- rf_wf |>
-  tune_grid(resamples = folds, grid = par_grid, metrics = metric_set(rmse))
-
-
+# Affichage des métriques
+print(paste("RMSE :", RMSE))
+print(paste("R-squared :", R2))
+print(paste("Erreur absolue moyenne :", mean_absolute_diff))
 ```
 
 ### c) Régression linéaire
@@ -1559,16 +1557,14 @@ R2_regRIDGE_att <- 1 - sum((comparison_poste_ridge_att$Actual - comparison_poste
 erreur_moy_abs_att_regRIDGE <- mean(comparison_poste_ridge_att$DifferenceAbs)
 ```
 
-### f) SVM
-
 ### g) Recap
 
 ```{r}
 recap <- data.frame(
-  Model = c("XG_att", "XG_mil", "XG_def", "XG_gar", "XG_tot", "Reg_tot","Reg_att", "Reg_LASSO","Reg_LASSO_att", "Reg_RIDGE", "Reg_RIDGE_att"),
-  R2 = c(R2_att_xg, R2_mil_xg, R2_def_xg, R2_gar_xg, R2_tot_xg, R2_reg_tot,R2_reg_att, R2_regLASSO_tot,R2_regLASSO_att, R2_regRIDGE_tot, R2_regRIDGE_att),
-  RMSE = c(RMSE_att_xg, RMSE_mil_xg, RMSE_def_xg, RMSE_gar_xg, RMSE_tot_xg, RMSE_reg_tot,RMSE_reg_att, RMSE_regLASSO_tot,RMSE_regLASSO_att, RMSE_regRIDGE_tot, RMSE_regRIDGE_att),
-  DifMoyAbs = c(erreur_moy_abs_att_xg, erreur_moy_abs_mil_xg, erreur_moy_abs_def_xg, erreur_moy_abs_gar_xg, erreur_moy_abs_tot_xg, erreur_moy_abs_tot_reg,erreur_moy_abs_att_reg,erreur_moy_abs_att_regLASSO, erreur_moy_abs_tot_regLASSO, erreur_moy_abs_tot_regRIDGE, erreur_moy_abs_att_regRIDGE)
+  Model = c("XG_att", "XG_mil", "XG_def", "XG_gar", "XG_tot", "Reg_tot","Reg_att", "Reg_LASSO","Reg_LASSO_att", "Reg_RIDGE", "Reg_RIDGE_att", "Rf_tot"),
+  R2 = c(R2_att_xg, R2_mil_xg, R2_def_xg, R2_gar_xg, R2_tot_xg, R2_reg_tot,R2_reg_att, R2_regLASSO_tot,R2_regLASSO_att, R2_regRIDGE_tot, R2_regRIDGE_att, R2_tot_rf),
+  RMSE = c(RMSE_att_xg, RMSE_mil_xg, RMSE_def_xg, RMSE_gar_xg, RMSE_tot_xg, RMSE_reg_tot,RMSE_reg_att, RMSE_regLASSO_tot,RMSE_regLASSO_att, RMSE_regRIDGE_tot, RMSE_regRIDGE_att, RMSE_tot_rf),
+  DifMoyAbs = c(erreur_moy_abs_att_xg, erreur_moy_abs_mil_xg, erreur_moy_abs_def_xg, erreur_moy_abs_gar_xg, erreur_moy_abs_tot_xg, erreur_moy_abs_tot_reg,erreur_moy_abs_att_reg,erreur_moy_abs_att_regLASSO, erreur_moy_abs_tot_regLASSO, erreur_moy_abs_tot_regRIDGE, erreur_moy_abs_att_regRIDGE,erreur_moy_abs_tot_rf)
 )
 
 recap <- recap %>%
@@ -1577,4 +1573,27 @@ recap <- recap %>%
 print(recap)
 ```
 
-### 
+## Conclusion de sélection de modèle
+
+Pour conclure sur la sélection de modèle, dans notre cas va s'opérer sur la population totale ( c'est à dire l'ensemble des postes de chacun des joeueurs). On veut un modèle qui soit le plus puissant possible pour prédire la note de joeueurs évoluant sur différents postes.
+
+Toutefois nous avons identifier quelques axes x'améliorations que l'on pourrait inclure à notre modèle pour le rendre légérement plus restrictif mais plus puissant :
+
+-   Transformer les variables pour qu'elles représentente toutes la même unités de mesures ( Dans notre jeu de données la quasi-totalités des variables sont exprimés par % sur un match ou par moyenne par matchs à l'exception de trois ( Min Joués, But et passes décisives nous allons donc essyayer de transformer cela afin d'étudier les gains de précisions de ce dernier.
+
+```{r}
+test_data <- all_data |> mutate(MJ_match = minJ/Apparences,
+                                But_match = (But/minJ)*90,
+                                PasseDe_match = (PasseDecisive/minJ)*90)
+
+
+```
+
+```{r}
+all_data_2 <- test_data |> filter(minJ >270)
+all_data_2 <- all_data_2 |> filter(MJ_match > 45)
+all_data_2 <- all_data_2 |> filter(Note >=6)
+all_data_2 <- all_data_2 |> filter(Note <=8)
+
+variable_a_tester_xg <- c("Age","MJ_match","But_match","PasseDe_match","Tirs","Dribbles","Passes_perc","moy_passes","centre_perc","interception","tacle","tirsBloques","driblesSubis","fautes","TaclesRecu")
+```
