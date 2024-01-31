@@ -9,7 +9,7 @@ output: html_document
 
 Fontaine Aymeric
 
-Tavian Mattéo
+Tavian Matteo
 
 Bertholon Kilian
 
@@ -35,9 +35,9 @@ Pour chacun des joueurs on dispose d'informations sur ses performances au court 
 
 -   Le nombre d'apparitions (en match)
 
--   Le nombre de but qu'il a inscrit
+-   Le nombre de but(s) qu'il a inscrit
 
--   Le nombre de passe décisive qu'il a délivré
+-   Le nombre de passe(s) décisive(s) qu'il a délivré
 
 -   Sa note moyenne sur l'ensemble de l'année
 
@@ -47,23 +47,23 @@ Pour chacun des joueurs on dispose d'informations sur ses performances au court 
 
 -   Le pourcentage de passes réussis par match
 
--   La moyenne de passe clé par match
+-   La moyenne de passes clés par match
 
--   Le pourcentage de centre réussis
+-   Le pourcentage de centres réussis
 
--   Le nombre de dégagemetn par match
+-   Le nombre de dégagement par match
 
--   Le nombre d'interception moyen par match
+-   Le nombre d'interception moyens par match
 
 -   Le nombre de tacle moyen par match
 
--   Le nombre de Tir bloqués moyen par match
+-   Le nombre de Tir bloqué moyen par match
 
 -   Le nombre de dribbles subis moyen par match
 
--   Le nombre de fautes moyen par match
+-   Le nombre de faute moyen par match
 
--   Le nombre de tacles moyen recu par match
+-   Le nombre de tacle moyen recu par match
 
 -   Le nombre de Hors-jeu moyen par match
 
@@ -1960,6 +1960,6 @@ combined_plot
 
 ```
 
-Pour conclure, le fil du rouge de ce projet à été d\'utiliser les différents modèles de Machine learning vue en cours dans le but de répondre à une problématique (dans notre cas un problème de régression). En se basant sur 3 indicateurs de performances des modèles de régression (R2, RMSE et et diffAbsMoy, nous avons essayer d\'estimer au mieux les notes de joueurs à partir d\'un ensemble de variables). L\'ensemble des modèles à été FineTuner par validation croisée pour sélectionner les meilleurs paramètres pour chacun des modèles.
+Pour conclure, le fil du rouge de ce projet à été d'utiliser les différents modèles de Machine learning vue en cours dans le but de répondre à une problématique (dans notre cas un problème de régression). En se basant sur 3 indicateurs de performances des modèles de régression (R2, RMSE et et diffAbsMoy, nous avons essayer d'estimer au mieux les notes de joueurs à partir d'un ensemble de variables). L'ensemble des modèles à été FineTuner par validation croisée pour sélectionner les meilleurs paramètres pour chacun des modèles.
 
-Enfin, après sélection du modèle le plus adapté (ici XGboost). Nous avons essayé d\'améliorer la prédiction de notre modèle en ajoutant des éléments restrictifs sur nos données (dans la mesure du raisonnables bien sûr).
+Enfin, après sélection du modèle le plus adapté (ici XGboost). Nous avons essayé d'améliorer la prédiction de notre modèle en ajoutant des éléments restrictifs sur nos données (dans la mesure du raisonnables bien sûr).
